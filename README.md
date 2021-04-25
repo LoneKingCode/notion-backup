@@ -2,7 +2,7 @@
 
 ## notion 自动备份脚本
 
-基于`python3`，利用 notion 官方 api，自动导出所有工作空间内数据为 markdown 格式,上传至 github，因为在 github，所以也拥有了版本历史功能。
+基于`python3`，利用 notion 官方 api，自动导出所有工作空间内数据为 markdown 格式,虽然官方 API 导出的为 zip，但是脚本会解压，然后一起上传至 github，因为在 github，所以也拥有了版本历史功能。
 
 ### Debian/Ubuntu 简单安装 python3 及 pip3
 
