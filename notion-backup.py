@@ -14,36 +14,12 @@ NOTION_EMAIL = os.getenv('NOTION_EMAIL', "")
 NOTION_PASSWORD = os.getenv('NOTION_PASSWORD', "")
 NOTION_API = os.getenv('NOTION_API', 'https://www.notion.so/api/v3')
 NOTION_TOKEN = os.getenv('NOTION_TOKEN', '')
-
 SAVE_DIR = "backup/"
 
 
-def runCommand(command, timeout=-1):
-    """
-    执行命令
-    Args:
-        command (str): 要执行的命令
-        timeout (int, 可选): 命令超时时间，超时会kill掉. 默认值-1.
-
-    Returns:
-        str: 命令输出内容 
-    """
-
-    cmd = command.split(" ")
-    start = datetime.datetime.now()
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1)
-
-    # 等待执行
-    while process.poll() is None:
-        now = datetime.datetime.now()
-        if timeout != -1 and (now - start).seconds > timeout:
-            print('执行命令:', command, "超时,timeout:", timeout)
-            os.kill(process.pid, signal.SIGKILL)
-            os.waitpid(-1, os.WNOHANG)
-
-    stdout, stderr = process.communicate()
-
-    print('执行本地命令:', command, '响应内容:', stdout, "\n")
+def writeLog(s):
+    with open('log.txt', 'a') as log:
+        log.write(str(time.time()) + ' ' + s + '\n')
 
 
 def unzip(filename: str, saveDir: str = ''):
@@ -66,6 +42,9 @@ def unzip(filename: str, saveDir: str = ''):
 
 
 def initNotionToken():
+    global NOTION_TOKEN
+    if NOTION_TOKEN:
+        return NOTION_TOKEN
     loginData = {'email': NOTION_EMAIL, 'password': NOTION_PASSWORD}
     headers = {
         # Notion obviously check this as some kind of (bad) test of CSRF
@@ -73,7 +52,7 @@ def initNotionToken():
     }
     response = requests.post(NOTION_API + '/loginWithEmail', json=loginData, headers=headers)
     response.raise_for_status()
-    global NOTION_TOKEN
+
     NOTION_TOKEN = response.cookies['token_v2']
     return response.cookies['token_v2']
 
@@ -144,10 +123,37 @@ def main():
         taskId = request_post('enqueueTask', exportTask(spaceId)).get('taskId')
         url = exportUrl(taskId)
         downloadAndUnzip(url, f'{spaceName}-{spaceId}.zip')
-        break
 
     push()
 
+    writeLog('备份完成')
+
+
+def run_retry():
+    count = 0
+    while True:
+        try:
+            main()
+            break
+        except Exception as e:
+            count += 1
+            writeLog('执行出错:' + str(e))
+            print('执行出错:', str(e))
+        if count > 3:
+            writeLog('尝试{}次出错'.format(count))
+            print('尝试{}次出错'.format(count))
+            break
+        time.sleep(15)
+
 
 if __name__ == "__main__":
-    main()
+    print('开始执行')
+    running = False
+    while True and not running:
+        now = datetime.datetime.now()
+        if now.hour == 3 and now.minute == 0:
+            running = True
+            run_retry()
+            running = False
+
+        time.sleep(30)
