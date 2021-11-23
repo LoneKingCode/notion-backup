@@ -148,12 +148,16 @@ def run_retry():
 
 if __name__ == "__main__":
     print('开始执行')
-    running = False
-    while True and not running:
-        now = datetime.datetime.now()
-        if now.hour == 3 and now.minute == 0:
-            running = True
-            run_retry()
-            running = False
+    run_retry()
 
-        time.sleep(30)
+# if __name__ == "__main__":
+#     print('开始执行')
+#     running = False
+#     while True and not running:
+#         now = datetime.datetime.now()
+#         if now.hour == 3 and now.minute == 0:
+#             running = True
+#             run_retry()
+#             running = False
+
+#         time.sleep(30)
