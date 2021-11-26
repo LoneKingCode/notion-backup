@@ -15,11 +15,12 @@ NOTION_PASSWORD = os.getenv('NOTION_PASSWORD', "")
 NOTION_API = os.getenv('NOTION_API', 'https://www.notion.so/api/v3')
 NOTION_TOKEN = os.getenv('NOTION_TOKEN', '')
 SAVE_DIR = "backup/"
-
+REPOSITORY_URL = "https://asd.git"
+REPOSITORY_BRANCH= "main"
 
 def writeLog(s):
     with open('log.txt', 'a') as log:
-        log.write(str(time.time()) + ' ' + s + '\n')
+        log.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ' ' + s + '\n')
 
 
 def unzip(filename: str, saveDir: str = ''):
@@ -103,15 +104,28 @@ def downloadAndUnzip(url, filename):
             shutil.copyfileobj(r.raw, f)
     unzip(savePath)
 
-
+def initGit():
+    os.system(f'git init')
+    os.system(f'git remote add origin {REPOSITORY_URL}')
+    os.system(f'git branch -M {REPOSITORY_BRANCH}')
+    os.system(f'git fetch --all && git reset --hard origin/{REPOSITORY_BRANCH}')
+    os.system(f'git pull origin {REPOSITORY_BRANCH}')
+ 
+def pull():
+    os.system(f'git pull origin {REPOSITORY_BRANCH}')
+    
 def push():
-    os.system(f'git pull && git add . && git commit -m "backup" && git push')
+    os.system(f'git add . && git commit -m "backup" && git push origin {REPOSITORY_BRANCH}')
 
 
 def main():
+    initGit()
     if not NOTION_TOKEN:
         initNotionToken()
-
+    print('拉取最新代码')
+    pull()
+    print('拉取完成')
+    
     userContent = getUserContent()
     userId = list(userContent["notion_user"].keys())[0]
     print(f"User id: {userId}")
@@ -123,8 +137,10 @@ def main():
         taskId = request_post('enqueueTask', exportTask(spaceId)).get('taskId')
         url = exportUrl(taskId)
         downloadAndUnzip(url, f'{spaceName}-{spaceId}.zip')
-
+    print('开始提交代码')
+    pull()
     push()
+    print('提交完成')
 
     writeLog('备份完成')
 
@@ -145,19 +161,7 @@ def run_retry():
             break
         time.sleep(15)
 
-
 if __name__ == "__main__":
     print('开始执行')
     run_retry()
-
-# if __name__ == "__main__":
-#     print('开始执行')
-#     running = False
-#     while True and not running:
-#         now = datetime.datetime.now()
-#         if now.hour == 3 and now.minute == 0:
-#             running = True
-#             run_retry()
-#             running = False
-
-#         time.sleep(30)
+ 
