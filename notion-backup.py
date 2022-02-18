@@ -71,7 +71,7 @@ def request_post(endpoint: str, params: object):
             'cookie': f'token_v2={NOTION_TOKEN}; '
         },
     )
-
+    print(response.json())
     return response.json()
 
 
