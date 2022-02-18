@@ -15,7 +15,7 @@ NOTION_PASSWORD = os.getenv('NOTION_PASSWORD', "")
 NOTION_API = os.getenv('NOTION_API', 'https://www.notion.so/api/v3')
 NOTION_TOKEN = os.getenv('NOTION_TOKEN', '')
 SAVE_DIR = "backup/"
-REPOSITORY_URL = "https://asd.git"
+REPOSITORY_URL = "https://github.com/LoneKingCode/lk-notion-backup.git"
 REPOSITORY_BRANCH= "main"
 
 def writeLog(s):
@@ -44,7 +44,7 @@ def unzip(filename: str, saveDir: str = ''):
 
 def initNotionToken():
     global NOTION_TOKEN
-    if NOTION_TOKEN:
+    if not NOTION_EMAIL and not NOTION_PASSWORD:
         return NOTION_TOKEN
     loginData = {'email': NOTION_EMAIL, 'password': NOTION_PASSWORD}
     headers = {
@@ -120,8 +120,8 @@ def push():
 
 def main():
     initGit()
-    if not NOTION_TOKEN:
-        initNotionToken()
+
+    initNotionToken()
     print('拉取最新代码')
     pull()
     print('拉取完成')
