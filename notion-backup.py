@@ -4,9 +4,7 @@ import time
 import json
 import zipfile
 import requests
-import datetime
-import subprocess
-import signal
+import argparse
 
 NOTION_TIMEZONE = os.getenv('NOTION_TIMEZONE', "Asia/Shanghai")
 NOTION_LOCALE = os.getenv('NOTION_TIMEZONE', "en")
@@ -15,7 +13,7 @@ NOTION_PASSWORD = os.getenv('NOTION_PASSWORD', "")
 NOTION_API = os.getenv('NOTION_API', 'https://www.notion.so/api/v3')
 NOTION_TOKEN = os.getenv('NOTION_TOKEN', '')
 SAVE_DIR = "backup/"
-REPOSITORY_URL = "https://github.com/LoneKingCode/lk-notion-backup.git"
+REPOSITORY_URL = "https://github.com/LoneKingCode/xxx.git"
 REPOSITORY_BRANCH= "main"
 
 def writeLog(s):
@@ -118,7 +116,7 @@ def push():
     os.system(f'git add . && git commit -m "backup" && git push origin {REPOSITORY_BRANCH}')
 
 
-def main():
+def main(spaceNames=[]):
     initGit()
 
     initNotionToken()
@@ -134,6 +132,8 @@ def main():
     print("Available spaces total:{}".format(len(spaces)))
     for (spaceId, spaceName) in spaces:
         print(f"\t-  {spaceId}:{spaceName}")
+        if spaceNames and spaceName not in spaceNames:
+            print('space:{} 跳过, 要备份的space为:{}'.format(spaceName, spaceNames))
         taskId = request_post('enqueueTask', exportTask(spaceId)).get('taskId')
         url = exportUrl(taskId)
         downloadAndUnzip(url, f'{spaceName}-{spaceId}.zip')
@@ -145,11 +145,11 @@ def main():
     writeLog('备份完成')
 
 
-def run_retry():
+def run_retry(spaceNames=[]):
     count = 0
     while True:
         try:
-            main()
+            main(spaceNames)
             break
         except Exception as e:
             count += 1
@@ -163,5 +163,25 @@ def run_retry():
 
 if __name__ == "__main__":
     print('开始执行')
-    run_retry()
- 
+    spaceNames = []
+    parser = argparse.ArgumentParser(description='ArgUtils')
+    parser.add_argument('-s', type=str, default='', required=False, help="要备份空间名称，多个逗号隔开，默认为所有")
+    args = parser.parse_args()
+    print(args)
+    if args.s:
+        spaceNames = args.s.split(',')
+        print('space names:{}'.format(spaceNames))
+    run_retry(spaceNames)
+
+# nohup python3 notion-backup.py 2>&1 >> /tmp/notion-backup.log
+# if __name__ == "__main__":
+#     print('开始执行')
+#     running = False
+#     while True and not running:
+#         now = datetime.datetime.now()
+#         if now.hour == 3 and now.minute == 0:
+#             running = True
+#             run_retry()
+#             running = False
+
+#         time.sleep(30)
