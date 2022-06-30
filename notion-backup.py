@@ -125,6 +125,7 @@ def main(spaceNames=[]):
     print('拉取完成')
     
     userContent = getUserContent()
+    time.sleep(10)
     userId = list(userContent["notion_user"].keys())[0]
     print(f"User id: {userId}")
 
