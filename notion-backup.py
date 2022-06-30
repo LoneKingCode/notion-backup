@@ -69,7 +69,7 @@ def request_post(endpoint: str, params: object):
             'cookie': f'token_v2={NOTION_TOKEN}; '
         },
     )
-    print(response.json())
+    #print(response.json())
     return response.json()
 
 
@@ -117,6 +117,7 @@ def push():
 
 
 def main(spaceNames=[]):
+    time_backup = time.time()
     initGit()
 
     initNotionToken()
@@ -128,7 +129,7 @@ def main(spaceNames=[]):
     time.sleep(10)
     userId = list(userContent["notion_user"].keys())[0]
     print(f"User id: {userId}")
-
+    backup_spaces=[]
     spaces = [(space_id, space_details["value"]["name"]) for (space_id, space_details) in userContent["space"].items()]
     print("Available spaces total:{}".format(len(spaces)))
     for (spaceId, spaceName) in spaces:
@@ -138,19 +139,22 @@ def main(spaceNames=[]):
         taskId = request_post('enqueueTask', exportTask(spaceId)).get('taskId')
         url = exportUrl(taskId)
         downloadAndUnzip(url, f'{spaceName}-{spaceId}.zip')
+        backup_spaces.append(spaceName)
     print('开始提交代码')
     pull()
     push()
     print('提交完成')
-
-    writeLog('备份完成')
+    time_backup = time.time() - time_backup
+    msg = '{}备份完成, 耗时:{}秒'.format(backup_spaces, int(time_backup))
+    writeLog(msg)
+    return msg
 
 
 def run_retry(spaceNames=[]):
     count = 0
     while True:
-        try:
-            main(spaceNames)
+        try:           
+            main(spaceNames)       
             break
         except Exception as e:
             count += 1
