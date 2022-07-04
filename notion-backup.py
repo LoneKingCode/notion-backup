@@ -5,7 +5,7 @@ import json
 import zipfile
 import requests
 import argparse
-
+import subprocess
 NOTION_TIMEZONE = os.getenv('NOTION_TIMEZONE', "Asia/Shanghai")
 NOTION_LOCALE = os.getenv('NOTION_TIMEZONE', "en")
 NOTION_EMAIL = os.getenv('NOTION_EMAIL', "")
@@ -18,6 +18,14 @@ REPOSITORY_BRANCH= "main"
 GIT_USERNAME='111'
 GIT_EMAIL='111@111.com'
 
+def run_command(cmd):
+    try:
+        proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+        # flag,stdout,stderr
+        return proc.stderr == '', proc.stdout, proc.stderr
+    except Exception as e:
+        return False, '', str(e)
+    
 def writeLog(s):
     with open('log.txt', 'a') as log:
         log.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ' ' + s + '\n')
@@ -105,19 +113,20 @@ def downloadAndUnzip(url, filename):
     unzip(savePath)
 
 def initGit():
-    os.system(f'git config --global user.name "{}"'.format(GIT_USERNAME))
-    os.system(f'git config --global user.email "{}"'.format(GIT_EMAIL))
-    os.system(f'git init')
-    os.system(f'git remote add origin {REPOSITORY_URL}')
-    os.system(f'git branch -M {REPOSITORY_BRANCH}')
-    os.system(f'git fetch --all && git reset --hard origin/{REPOSITORY_BRANCH}')
-    os.system(f'git pull origin {REPOSITORY_BRANCH}')
- 
+    flag,msg,err = run_command(f'git config --global user.name "{GIT_USERNAME}"')
+    flag,msg,err = run_command(f'git config --global user.email "{GIT_EMAIL}"')
+    flag,msg,err = run_command(f'git config pull.ff false')
+    flag,msg,err = run_command(f'git init')
+    flag,msg,err = run_command(f'git remote add origin {REPOSITORY_URL}')
+    flag,msg,err = run_command(f'git branch -M {REPOSITORY_BRANCH}')
+    flag,msg,err = run_command(f'git fetch --all && git reset --hard origin/{REPOSITORY_BRANCH}')
+    flag,msg,err = run_command(f'git pull origin {REPOSITORY_BRANCH}')
+    
 def pull():
-    os.system(f'git pull origin {REPOSITORY_BRANCH}')
+    flag,msg,err = run_command(f'git pull origin {REPOSITORY_BRANCH}')
     
 def push():
-    os.system(f'git add . && git commit -m "backup" && git push origin {REPOSITORY_BRANCH}')
+    flag,msg,err = run_command(f'git add . && git commit -m "backup" && git push origin {REPOSITORY_BRANCH}')
 
 
 def main(spaceNames=[]):
@@ -137,13 +146,14 @@ def main(spaceNames=[]):
     spaces = [(space_id, space_details["value"]["name"]) for (space_id, space_details) in userContent["space"].items()]
     print("Available spaces total:{}".format(len(spaces)))
     for (spaceId, spaceName) in spaces:
-        print(f"\t-  {spaceId}:{spaceName}")
+        print(f"{spaceId}:{spaceName}")
         if spaceNames and spaceName not in spaceNames:
             print('space:{} 跳过, 要备份的space为:{}'.format(spaceName, spaceNames))
         taskId = request_post('enqueueTask', exportTask(spaceId)).get('taskId')
         url = exportUrl(taskId)
         downloadAndUnzip(url, f'{spaceName}-{spaceId}.zip')
         backup_spaces.append(spaceName)
+        time.sleep(10)
     print('开始提交代码')
     pull()
     push()
