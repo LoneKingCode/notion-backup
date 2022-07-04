@@ -15,6 +15,8 @@ NOTION_TOKEN = os.getenv('NOTION_TOKEN', '')
 SAVE_DIR = "backup/"
 REPOSITORY_URL = "https://github.com/LoneKingCode/xxx.git"
 REPOSITORY_BRANCH= "main"
+GIT_USERNAME='111'
+GIT_EMAIL='111@111.com'
 
 def writeLog(s):
     with open('log.txt', 'a') as log:
@@ -103,6 +105,8 @@ def downloadAndUnzip(url, filename):
     unzip(savePath)
 
 def initGit():
+    os.system(f'git config --global user.name "{}"'.format(GIT_USERNAME))
+    os.system(f'git config --global user.email "{}"'.format(GIT_EMAIL))
     os.system(f'git init')
     os.system(f'git remote add origin {REPOSITORY_URL}')
     os.system(f'git branch -M {REPOSITORY_BRANCH}')
