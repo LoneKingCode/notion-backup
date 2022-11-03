@@ -56,7 +56,13 @@ pip3 install requests shutil zipfile signal
 默认存储到程序目录`backup`文件夹,如需修改，修改脚本中变量`SAVE_DIR`的值
 
 ### 4. 上传到远程存储
-
+修改以下信息
+```
+REPOSITORY_URL = "https://github.com/LoneKingCode/xxx.git"
+REPOSITORY_BRANCH= "main"
+GIT_USERNAME='111'
+GIT_EMAIL='111@111.com'
+```
 默认上传到 github，如果使用，需要自己新建一个私有仓库，然后 notion-backup.py 提交至该新仓库，然后在该仓库目录下运行 notion-backup.py 即可，记得修改`.git`文件夹中的`config`文件，把用户名和密码配置到仓库地址 https://username:password@github.com/username/notion-backup.git 上，防止脚本自动 push 代码时，需要输入用户名密码
 
 ### 5. 执行脚本
