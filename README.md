@@ -31,7 +31,7 @@ pip3 -V
 需要安装相关依赖包
 
 ```
-pip3 install requests shutil zipfile signal
+pip3 install requests shutil zipfile
 ```
 
 ### 使用方法:
