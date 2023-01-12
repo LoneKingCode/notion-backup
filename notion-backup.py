@@ -209,7 +209,7 @@ def push():
 
 def main():
     # 初始化git仓库
-    #initGit()
+    initGit()
 
     # 初始化Token
     initNotionToken()
