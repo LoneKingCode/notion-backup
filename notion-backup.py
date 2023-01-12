@@ -9,7 +9,18 @@ import subprocess
 
 # ={'spaces':[]} 则备份所有空间 'space_blocks':[] 则备份整个空间
 # block id格式切记为-隔开!!!
-DEFAULT_BACKUP_CONFIG = {'spaces': [{'space_name': 'space_name', 'space_blocks': [{'block_id': '12345678-1234-1234-1234-123456789123', 'block_name': 'Home'}]}]}
+DEFAULT_BACKUP_CONFIG = {
+    'spaces': [{
+        'space_name': 'space_name',
+        'space_blocks': [{
+            'block_id': '12345678-1234-1234-1234-123456789123',
+            'block_name': 'Home1'
+        }, {
+            'block_id': '12345678-1234-1234-1234-123456789123',
+            'block_name': 'Home2'
+        }]
+    }]
+}
 
 # 默认配置无需更改
 NOTION_TIMEZONE = os.getenv('NOTION_TIMEZONE', 'Asia/Shanghai')
