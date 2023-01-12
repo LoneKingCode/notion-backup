@@ -100,6 +100,9 @@ python3 notion-backup.py
 config.json为上面备份配置的json格式数据,注意里面符号为#双引号#
 python3 notion-backup.py -c /your_dir/config.json
 ```
+```python
+run_job.py是利用python的schedule定时执行的,有需要可以用
+```
 ### 7. 导出其他格式
 
 修改代码中`exportTask`方法中的`exportType`为要导出的类型
