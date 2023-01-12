@@ -97,7 +97,7 @@ notion-backup.py顶部的`DEFAULT_BACKUP_CONFIG`变量
 python3 notion-backup.py
 ```
 ```shell
-config.json为上面备份配置的json格式数据,注意里面符号为`双引号`
+config.json为上面备份配置的json格式数据,注意里面符号为#双引号#
 python3 notion-backup.py -c /your_dir/config.json
 ```
 ### 7. 导出其他格式
