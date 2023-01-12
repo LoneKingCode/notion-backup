@@ -128,10 +128,10 @@ markdown/html/pdf
 
 ### 10. 其他使用方法
 
-搭配`Github`的`CI/DI`以及`Schedule`，可以实现全自动定时打包，上传，而且不需要在自己的服务器上执行。
-参考文件.github/workflows/backup.yml
-需要配置secret,在项目主页菜单的settings/secrets and variables/Actions中配置
-需要定时执行的话配置schedule,修改cron表达式
+搭配`Github`的`CI/DI`以及`Schedule`，可以实现全自动定时打包，上传，而且不需要在自己的服务器上执行。  
+参考文件.github/workflows/backup.yml  
+需要配置secret,在项目主页菜单的settings/secrets and variables/Actions中配置  
+需要定时执行的话配置schedule,修改cron表达式  
 ```yaml
 on:
   schedule:
