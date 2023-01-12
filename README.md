@@ -31,7 +31,7 @@ pip3 -V
 需要安装相关依赖包
 
 ```
-pip3 install requests shutil zipfile
+pip3 install requests
 ```
 
 ### 使用方法:
@@ -65,26 +65,55 @@ GIT_USERNAME='111'
 GIT_EMAIL='111@111.com'
 ```
 默认上传到 github，如果使用，需要自己新建一个私有仓库，然后 notion-backup.py 提交至该新仓库，然后在该仓库目录下运行 notion-backup.py 即可，记得修改`.git`文件夹中的`config`文件，把用户名和密码配置到仓库地址 https://username:password@github.com/username/notion-backup.git 上，防止脚本自动 push 代码时，需要输入用户名密码
-
-### 5. 执行脚本
+### 5. 备份配置
+notion-backup.py顶部的`DEFAULT_BACKUP_CONFIG`变量
+主要`block_id`是`-`分开的注意位数
+{'spaces':[]} 则备份所有空间 'space_blocks':[] 则备份整个空间
+```python 
+# 1.备份所有空间
+{'spaces': []}
+# 2.备份指定空间所有block
+{'spaces': [
+        {'space_name': 'space_name', 'space_blocks': []}
+    ]
+}
+# 2.1两种方式都可以
+{'spaces': [
+        {'space_name': 'space_name'}
+    ]
+}
+# 3.备份指定空间指定block及block的子页面
+{'spaces': [
+        {'space_name': 'space_name', 'space_blocks': [
+                {'block_id': '12345678-1234-1234-1234-123456789123', 'block_name': 'Home'}
+            ]
+        }
+    ]
+}
+```
+### 6. 执行脚本
 
 ```shell
 python3 notion-backup.py
 ```
-
-### 6. 导出其他格式
+```shell
+config.json为上面备份配置的json格式数据,注意里面符号为`双引号`
+python3 notion-backup.py -c /your_dir/config.json
+```
+### 7. 导出其他格式
 
 修改代码中`exportTask`方法中的`exportType`为要导出的类型
+markdown/html/pdf
 
-### 7. 注意事项
+### 8. 注意事项
 
 windows 路径最大长度 255 字符，notion 的文件夹、文件末尾都带了类似 md5 的东西，所以文件树过深时，windows 系统上解压会报错，目录树过深时请于 linux 系统使用
 
-### 8. 使用效果
+### 9. 使用效果
 
 ![image](https://user-images.githubusercontent.com/11244921/115993906-66866e00-a607-11eb-8d3b-21d935e1c56f.png)
 ![image](https://user-images.githubusercontent.com/11244921/115993882-54a4cb00-a607-11eb-9ef0-fdd952c62159.png)
 
-### 9. 其他使用方法
+### 10. 其他使用方法
 
 搭配`Github`的`CI/DI`以及`Schedule`，可以实现全自动定时打包，上传，而且不需要在自己的服务器上执行。
