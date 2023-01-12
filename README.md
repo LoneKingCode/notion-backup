@@ -111,10 +111,14 @@ markdown/html/pdf
 ### 8. 注意事项
 
 #### 8.1 windows 路径最大长度 255 字符，notion 的文件夹、文件末尾都带了类似 md5 的东西，所以文件树过深时，windows 系统上解压会报错，目录树过深时请于 linux 系统使用  
-#### 8.2 如果不需要提交到git注释代码中initGit()
+#### 8.2 如果不需要提交到git注释代码中initGit() pull() push()
  ```python
     # 初始化git仓库
     #initGit()
+    # git
+    #print('开始提交代码')
+    #pull()
+    #push()
  ```
 
 ### 9. 使用效果

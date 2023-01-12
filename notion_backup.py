@@ -265,6 +265,11 @@ def main():
                 downloadAndUnzip(url, f'{spaceName}.zip')
         else:
             print('space:{}跳过 不在备份列表'.format(spaceName))
+
+    # git
+    print('开始提交代码')
+    pull()
+    push()
     writeLog('备份完成')
 
 
