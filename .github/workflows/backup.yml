@@ -11,7 +11,7 @@ name: CI
 #     branches: [main]
 on:
   # schedule:
-  #   - cron: "0 7 * * *" # 每天7点执行
+  #   - cron: "0 7 * * *" # 每天7点执行 , 去掉此处注释开启触发
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -32,7 +32,7 @@ jobs:
         run: pip3 install requests
       - name: run notion_backup.py
         env:
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }} # 在后台配置好token,或者用NOTION_EMAIL和NOTION_PASSWORD也可以
         run: |
           echo '开始执行'
           python notion_backup.py

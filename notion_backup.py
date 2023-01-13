@@ -6,6 +6,7 @@ import zipfile
 import requests
 import argparse
 import subprocess
+from notify import send
 
 # ={'spaces':[]} 则备份所有空间 'space_blocks':[] 则备份整个空间
 # block id格式切记为-隔开!!!
@@ -56,6 +57,7 @@ def writeLog(s):
     with open('log.txt', 'a') as log:
         msg = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()) + ' ' + s
         print(msg)
+        send('notion备份', msg)
         log.write(msg + '\n')
 
 
@@ -270,7 +272,7 @@ def main():
     print('开始提交代码')
     pull()
     push()
-    writeLog('备份完成')
+    writeLog('notion备份完成')
 
 
 def run_retry():
@@ -281,17 +283,17 @@ def run_retry():
             break
         except Exception as e:
             count += 1
-            writeLog('执行出错:' + str(e))
+            writeLog('notion备份执行出错:' + str(e))
             print('执行出错:', str(e))
         if count > 3:
-            writeLog('尝试{}次出错'.format(count))
+            writeLog('notion备份尝试{}次出错'.format(count))
             print('尝试{}次出错'.format(count))
             break
         time.sleep(15)
 
 
 if __name__ == '__main__':
-    writeLog('开始执行')
+    writeLog('开始执行notion备份')
     parser = argparse.ArgumentParser(description='ArgUtils')
     parser.add_argument('-c',
                         type=str,
