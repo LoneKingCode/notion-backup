@@ -127,9 +127,9 @@ markdown/html/pdf
  ```
 
 ### 9. 使用效果
+![image](https://user-images.githubusercontent.com/11244921/212226093-773c7c7d-3020-4bb8-825f-e9459452301a.png)
+![image](https://user-images.githubusercontent.com/11244921/212226257-8b64b5fa-07a9-4eb6-b912-6d20e34c8c80.png)
 
-![image](https://user-images.githubusercontent.com/11244921/115993906-66866e00-a607-11eb-8d3b-21d935e1c56f.png)
-![image](https://user-images.githubusercontent.com/11244921/115993882-54a4cb00-a607-11eb-9ef0-fdd952c62159.png)
 
 ### 10. 消息推送
 修改`notify.py`中顶部的推送参数即可，比如TG推送就设置`push_config`的 `TG_BOT_TOKEN`和`TG_USER_ID`
