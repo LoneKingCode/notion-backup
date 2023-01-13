@@ -128,6 +128,8 @@ markdown/html/pdf
 
 ### 10. 消息推送
 修改`notify.py`中顶部的推送参数即可，比如TG推送就设置`push_config`的 `TG_BOT_TOKEN`和`TG_USER_ID`
+![image](https://user-images.githubusercontent.com/11244921/212223591-e44c678c-d391-4108-9a62-c74cb79e16f8.png)
+
 ### 11. 其他使用方法
 
 搭配`Github`的`CI/DI`以及`Schedule`，可以实现全自动定时打包，上传，而且不需要在自己的服务器上执行。  
