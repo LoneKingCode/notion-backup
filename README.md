@@ -68,6 +68,14 @@ GIT_EMAIL ='111@111.com'
 注：如果不用ci执行，在服务器本地执行的话  
 记得修改`.git`文件夹中的`config`文件，把用户名和密码配置到仓库地址 https://username:password@github.com/username/notion-backup.git 上，防止脚本自动 push 代码时，需要输入用户名密码
 或者手动先push一次，并且设置credentials
+
+记得设置保存备份文件仓库的.gitignore为这样
+```
+*.zip
+/backup/*.zip
+log.txt
+__pycache__
+```
 ### 5. 备份配置
 notion-backup.py顶部的`DEFAULT_BACKUP_CONFIG`变量
 主要`block_id`是`-`分开的注意位数
