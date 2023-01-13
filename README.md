@@ -93,6 +93,8 @@ notion-backup.py顶部的`DEFAULT_BACKUP_CONFIG`变量
         }
     ]
 }
+# 4.也可以修改config.json
+config.json为上面备份配置的json格式数据,注意里面符号为#双引号#
 ```
 ### 6. 执行脚本
 
