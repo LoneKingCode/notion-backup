@@ -155,7 +155,7 @@ def exportSpaceBlock(spaceId, blockId):
 
 
 def request_post(endpoint: str, params: object):
-    print('reqeust:{} {}'.format(endpoint, params))
+    #print('reqeust:{} {}'.format(endpoint, params))
     response = requests.post(
         f'{NOTION_API}/{endpoint}',
         data=json.dumps(params).encode('utf8'),
@@ -181,7 +181,7 @@ def exportUrl(taskId):
         task = next(t for t in tasks if t['id'] == taskId)
         if task['state'] == 'success':
             url = task['status']['exportURL']
-            print(url)
+            print("download url:" + url)
             break
         elif task['state'] == 'failure':
             print(task['error'])
@@ -199,6 +199,7 @@ def downloadAndUnzip(url, filename):
         with open(savePath, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     unzip(savePath)
+    #print('保存文件:' + savePath)
 
 
 def initGit():
@@ -231,8 +232,8 @@ def main():
     userContent = getUserContent()
     time.sleep(3)
 
-    userId = list(userContent['notion_user'].keys())[0]
-    print(f'User id: {userId}')
+    #userId = list(userContent['notion_user'].keys())[0]
+    #print(f'User id: {userId}')
 
     spaces = [(space_id, space_details['value']['name']) for (space_id, space_details) in userContent['space'].items()]
     backup_space_names = []
@@ -241,7 +242,7 @@ def main():
         if backup_config_item['space_name']:
             backup_space_names.append(backup_config_item['space_name'])
             backup_space_config[backup_config_item['space_name']] = backup_config_item
-    print('Available spaces total:{}'.format(len(spaces)))
+    print(f'Available spaces total:{len(spaces)}')
     for (spaceId, spaceName) in spaces:
         print(f'\t-  {spaceId}:{spaceName}')
         taskId = ''
