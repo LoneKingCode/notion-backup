@@ -60,11 +60,22 @@ pip3 install requests
 修改以下信息
 ```
 REPOSITORY_URL = "https://github.com/LoneKingCode/xxx.git"
-REPOSITORY_BRANCH= "main"
-GIT_USERNAME='111'
-GIT_EMAIL='111@111.com'
+REPOSITORY_BRANCH = "main"
+GIT_USERNAME ='111'
+GIT_EMAIL ='111@111.com'
 ```
-默认上传到 github，如果使用，需要自己新建一个私有仓库，然后 notion-backup.py 提交至该新仓库，然后在该仓库目录下运行 notion-backup.py 即可，记得修改`.git`文件夹中的`config`文件，把用户名和密码配置到仓库地址 https://username:password@github.com/username/notion-backup.git 上，防止脚本自动 push 代码时，需要输入用户名密码
+默认上传到 github，如果使用，需要自己新建一个私有仓库，然后 notion-backup.py 提交至该新仓库，然后在该仓库目录下运行 notion-backup.py 即可  
+注：如果不用ci执行，在服务器本地执行的话  
+记得修改`.git`文件夹中的`config`文件，把用户名和密码配置到仓库地址 https://username:password@github.com/username/notion-backup.git 上，防止脚本自动 push 代码时，需要输入用户名密码
+或者手动先push一次，并且设置credentials
+
+记得设置保存备份文件仓库的.gitignore为这样
+```
+*.zip
+/backup/*.zip
+log.txt
+__pycache__
+```
 ### 5. 备份配置
 notion-backup.py顶部的`DEFAULT_BACKUP_CONFIG`变量
 主要`block_id`是`-`分开的注意位数
@@ -90,6 +101,8 @@ notion-backup.py顶部的`DEFAULT_BACKUP_CONFIG`变量
         }
     ]
 }
+# 4.也可以修改config.json
+config.json为上面备份配置的json格式数据,注意里面符号为#双引号#
 ```
 ### 6. 执行脚本
 
@@ -122,12 +135,14 @@ markdown/html/pdf
  ```
 
 ### 9. 使用效果
+![image](https://user-images.githubusercontent.com/11244921/212226093-773c7c7d-3020-4bb8-825f-e9459452301a.png)
+![image](https://user-images.githubusercontent.com/11244921/212226257-8b64b5fa-07a9-4eb6-b912-6d20e34c8c80.png)
 
-![image](https://user-images.githubusercontent.com/11244921/115993906-66866e00-a607-11eb-8d3b-21d935e1c56f.png)
-![image](https://user-images.githubusercontent.com/11244921/115993882-54a4cb00-a607-11eb-9ef0-fdd952c62159.png)
 
 ### 10. 消息推送
 修改`notify.py`中顶部的推送参数即可，比如TG推送就设置`push_config`的 `TG_BOT_TOKEN`和`TG_USER_ID`
+![image](https://user-images.githubusercontent.com/11244921/212223591-e44c678c-d391-4108-9a62-c74cb79e16f8.png)
+
 ### 11. 其他使用方法
 
 搭配`Github`的`CI/DI`以及`Schedule`，可以实现全自动定时打包，上传，而且不需要在自己的服务器上执行。  
