@@ -83,6 +83,7 @@ def unzip(filename: str, saveDir: str = ''):
 def initNotionToken():
     global NOTION_TOKEN
     if not NOTION_EMAIL and not NOTION_PASSWORD:
+        print('使用已设置的token:{}'.format(NOTION_TOKEN))
         return NOTION_TOKEN
     loginData = {'email': NOTION_EMAIL, 'password': NOTION_PASSWORD}
     headers = {
@@ -93,6 +94,7 @@ def initNotionToken():
     response.raise_for_status()
 
     NOTION_TOKEN = response.cookies['token_v2']
+    print('使用账户获取到的token:{}'.format(NOTION_TOKEN))
     return response.cookies['token_v2']
 
 
