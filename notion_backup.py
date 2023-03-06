@@ -201,7 +201,7 @@ def downloadAndUnzip(url, filename):
         with open(savePath, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     unzip(savePath)
-    #print('保存文件:' + savePath)
+    print('保存文件:' + savePath)
 
 
 def initGit():
