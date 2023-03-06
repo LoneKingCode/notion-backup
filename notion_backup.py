@@ -190,7 +190,6 @@ def exportUrl(taskId):
         else:
             print('{}.'.format(task['state']), end='', flush=True)
             time.sleep(10)
-
     return url
 
 
@@ -201,8 +200,10 @@ def downloadAndUnzip(url, filename):
         with open(savePath, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     unzip(savePath)
-    print('保存文件:' + savePath)
-
+    if os.path.exists(savePath):  
+        print('保存文件:' + savePath)
+    else:
+        print('保存文件:' + savePath +'失败')
 
 def initGit():
     run_command(f'git config --global user.name {GIT_USERNAME}')
