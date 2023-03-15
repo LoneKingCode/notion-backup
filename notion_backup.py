@@ -204,6 +204,14 @@ def downloadAndUnzip(url, filename):
         print('保存文件:' + savePath)
     else:
         print('保存文件:' + savePath +'失败')
+        
+    zip_dir = savePath.replace(".zip", "")
+    for file in os.listdir(zip_dir):
+        file_path = os.path.join(zip_dir, file)
+        if '.zip' in file_path:
+            unzip(file_path)
+            os.remove(file_path)
+
 
 def initGit():
     run_command(f'git config --global user.name {GIT_USERNAME}')
