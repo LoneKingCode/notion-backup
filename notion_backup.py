@@ -84,6 +84,22 @@ def unzip(filename: str, saveDir: str = ''):
         print(f'{filename} unzip fail,{str(e)}')
 
 
+def zip_dir(dirpath, outFullName):
+    """
+        压缩指定文件夹
+        :param dirpath: 目标文件夹路径
+        :param outFullName: 压缩文件保存路径+xxxx.zip
+        :return: 无
+    """
+    zip = zipfile.ZipFile(outFullName, "w", zipfile.ZIP_DEFLATED)
+    for path, dirnames, filenames in os.walk(dirpath):
+        # 去掉目标跟路径，只对目标文件夹下边的文件及文件夹进行压缩
+        fpath = path.replace(dirpath, '')
+        for filename in filenames:
+            zip.write(os.path.join(path, filename), os.path.join(fpath, filename))
+    zip.close()
+
+
 def initNotionToken():
     global NOTION_TOKEN
     if not NOTION_EMAIL and not NOTION_PASSWORD:
@@ -236,13 +252,16 @@ def downloadAndUnzip(url, filename):
     else:
         print('保存文件:' + savePath + '失败')
 
-    zip_dir = savePath.replace(".zip", "")
-    for file in os.listdir(zip_dir):
-        file_path = os.path.join(zip_dir, file)
+    save_dir = savePath.replace(".zip", "")
+    for file in os.listdir(save_dir):
+        file_path = os.path.join(save_dir, file)
         if '.zip' in file_path:
             unzip(file_path)
             os.remove(file_path)
-    remove_files_id()
+    if REMOVE_FILES_ID:
+        remove_files_id()
+        os.remove(savePath)
+        zip_dir(save_dir, savePath)
 
 
 def initGit():
