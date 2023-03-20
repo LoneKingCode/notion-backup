@@ -6,6 +6,7 @@ import zipfile
 import requests
 import argparse
 import subprocess
+import re
 from notify import send
 
 # ={'spaces':[]} 则备份所有空间 'space_blocks':[] 则备份整个空间
@@ -22,6 +23,9 @@ DEFAULT_BACKUP_CONFIG = {
         }]
     }]
 }
+
+# 是否去除所有文件和文件夹的id
+REMOVE_FILES_ID = True
 
 # 默认配置无需更改
 NOTION_TIMEZONE = os.getenv('NOTION_TIMEZONE', 'Asia/Shanghai')
@@ -193,6 +197,33 @@ def exportUrl(taskId):
     return url
 
 
+def remove_files_id():
+    if not REMOVE_FILES_ID:
+        return
+    for root, dirs, files in os.walk(SAVE_DIR):
+        for file in files:
+            path = os.path.join(root, file)
+            filename_id = re.compile(r'[a-fA-F\d]{32}').findall(file)
+            if filename_id:
+                new_filename = file.replace(' ' + filename_id[0], '')
+                new_path = os.path.join(root, new_filename)
+                os.rename(path, new_path)
+    while True:
+        rename_dir_flag = False
+        for root, dirs, files in os.walk(SAVE_DIR):
+            for dir in dirs:
+                path = os.path.join(root, dir)
+                dir_id = re.compile(r'[a-fA-F\d]{8}-[a-fA-F\d]{4}-[a-fA-F\d]{4}-[a-fA-F\d]{4}-[a-fA-F\d]{12}').findall(dir)
+                if dir_id:
+                    new_dirname = dir.replace('-' + dir_id[0], '')
+                    new_path = os.path.join(root, new_dirname)
+                    os.rename(path, new_path)
+                    rename_dir_flag = True
+                    break
+        if not rename_dir_flag:
+            break
+
+
 def downloadAndUnzip(url, filename):
     os.makedirs(SAVE_DIR, exist_ok=True)
     savePath = SAVE_DIR + filename
@@ -200,17 +231,18 @@ def downloadAndUnzip(url, filename):
         with open(savePath, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     unzip(savePath)
-    if os.path.exists(savePath):  
+    if os.path.exists(savePath):
         print('保存文件:' + savePath)
     else:
-        print('保存文件:' + savePath +'失败')
-        
+        print('保存文件:' + savePath + '失败')
+
     zip_dir = savePath.replace(".zip", "")
     for file in os.listdir(zip_dir):
         file_path = os.path.join(zip_dir, file)
         if '.zip' in file_path:
             unzip(file_path)
             os.remove(file_path)
+    remove_files_id()
 
 
 def initGit():
