@@ -83,6 +83,7 @@ def unzip(filename: str, saveDir: str = ''):
 def initNotionToken():
     global NOTION_TOKEN
     if not NOTION_EMAIL and not NOTION_PASSWORD:
+        print('使用已设置的token:{}'.format(NOTION_TOKEN))
         return NOTION_TOKEN
     loginData = {'email': NOTION_EMAIL, 'password': NOTION_PASSWORD}
     headers = {
@@ -93,6 +94,7 @@ def initNotionToken():
     response.raise_for_status()
 
     NOTION_TOKEN = response.cookies['token_v2']
+    print('使用账户获取到的token:{}'.format(NOTION_TOKEN))
     return response.cookies['token_v2']
 
 
@@ -188,7 +190,6 @@ def exportUrl(taskId):
         else:
             print('{}.'.format(task['state']), end='', flush=True)
             time.sleep(10)
-
     return url
 
 
@@ -199,7 +200,17 @@ def downloadAndUnzip(url, filename):
         with open(savePath, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     unzip(savePath)
-    #print('保存文件:' + savePath)
+    if os.path.exists(savePath):  
+        print('保存文件:' + savePath)
+    else:
+        print('保存文件:' + savePath +'失败')
+        
+    zip_dir = savePath.replace(".zip", "")
+    for file in os.listdir(zip_dir):
+        file_path = os.path.join(zip_dir, file)
+        if '.zip' in file_path:
+            unzip(file_path)
+            os.remove(file_path)
 
 
 def initGit():
