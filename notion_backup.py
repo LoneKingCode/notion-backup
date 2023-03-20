@@ -25,7 +25,7 @@ DEFAULT_BACKUP_CONFIG = {
 }
 
 # 是否去除所有文件和文件夹的id
-REMOVE_FILES_ID = True
+REMOVE_FILES_ID = False
 
 # 默认配置无需更改
 NOTION_TIMEZONE = os.getenv('NOTION_TIMEZONE', 'Asia/Shanghai')
