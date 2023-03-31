@@ -36,6 +36,8 @@ NOTION_EMAIL = os.getenv('NOTION_EMAIL', '')
 NOTION_PASSWORD = os.getenv('NOTION_PASSWORD', '')
 # 修改为浏览器内获取到的token
 NOTION_TOKEN = os.getenv('NOTION_TOKEN', 'YOUR TOKEN')
+# 登录后获取 下载文件需要
+NOTION_FILE_TOKEN = ''
 NOTION_EXPORT_TYPE = os.getenv('NOTION_EXPORT_TYPE', 'markdown')  # html pdf
 # 备份文件保存目录
 SAVE_DIR = 'backup/'
@@ -177,18 +179,25 @@ def exportSpaceBlock(spaceId, blockId):
 
 
 def request_post(endpoint: str, params: object):
+    global NOTION_FILE_TOKEN
     #print('reqeust:{} {}'.format(endpoint, params))
-    response = requests.post(
-        f'{NOTION_API}/{endpoint}',
-        data=json.dumps(params).encode('utf8'),
-        headers={
-            'content-type': 'application/json',
-            'cookie': f'token_v2={NOTION_TOKEN}; '
-        },
-    )
-    #print(response.json())
-    return response.json()
-
+    try:
+        response = requests.post(
+            f'{NOTION_API}/{endpoint}',
+            data=json.dumps(params).encode('utf8'),
+            headers={
+                'content-type': 'application/json',
+                'cookie': f'token_v2={NOTION_TOKEN};'
+            },
+        )
+        if response:
+            if not NOTION_FILE_TOKEN and response.cookies['file_token']:              
+                NOTION_FILE_TOKEN = response.cookies['file_token']
+            return response.json()
+        else:
+            print('request url:{} error response:{}'.format(endpoint, response))
+    except Exception as e:
+        print('request url:{} error {}'.format(endpoint, e))
 
 def getUserContent():
     return request_post('loadUserContent', {})['recordMap']
@@ -243,7 +252,7 @@ def remove_files_id():
 def downloadAndUnzip(url, filename):
     os.makedirs(SAVE_DIR, exist_ok=True)
     savePath = SAVE_DIR + filename
-    with requests.get(url, stream=True) as r:
+    with requests.get(url, stream=True, headers={'cookie': f'file_token={NOTION_FILE_TOKEN}'}) as r:
         with open(savePath, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     unzip(savePath)
