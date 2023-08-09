@@ -9,7 +9,6 @@ import re
 import threading
 import time
 import urllib.parse
-
 import requests
 
 # 原先的 print 函数和主线程的锁
@@ -58,6 +57,9 @@ push_config = {
     'QYWX_KEY': '',  # 企业微信机器人
     'TG_BOT_TOKEN': '',  # 必填！ tg 机器人的 TG_BOT_TOKEN，例：1407203283:AAG9rt-6RDaaX0HBLZQq0laNOh898iFYaRQ
     'TG_USER_ID': '',  # 必填！ tg 机器人的 TG_USER_ID，例：1434078534
+    'WXPUSHER_URL': '',
+    'WXPUSHER_TOKEN': '',
+    'WXPUSHER_TOPICS': [],
     'TG_API_HOST': '',  # tg 代理 api
     'TG_PROXY_AUTH': '',  # tg 代理认证参数
     'TG_PROXY_HOST': '',  # tg 机器人的 TG_PROXY_HOST
@@ -403,6 +405,17 @@ def wecom_bot(title: str, content: str) -> None:
         print("企业微信机器人推送失败！")
 
 
+def wxpusher(title, content) -> None:
+    headers = {'content-type': 'application/json'}
+    data = {"appToken": push_config.get("WXPUSHER_TOKEN"), "content": content, "summary": title, "contentType": 1, "topicIds": push_config.get("WXPUSHER_TOPICS"), "verifyPay": False}
+
+    response = requests.post(url=push_config.get("WXPUSHER_URL"), data=json.dumps(data), headers=headers, timeout=15).json()
+    if response["errcode"] == 0:
+        print("wxpusher推送成功！")
+    else:
+        print("wxpusher推送失败！")
+
+
 def telegram_bot(title: str, content: str) -> None:
     """
     使用 telegram 机器人 推送消息。
@@ -472,6 +485,8 @@ if push_config.get("QYWX_KEY"):
     notify_function.append(wecom_bot)
 if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"):
     notify_function.append(telegram_bot)
+if push_config.get('WXPUSHER_URL') and push_config.get('') and push_config.get(''):
+    notify_function.append(wxpusher)
 
 
 def send(title: str, content: str) -> None:
