@@ -1,7 +1,6 @@
 import subprocess
 from notify import send
 
-
 def run_command(cmd):
     try:
         proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
