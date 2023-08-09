@@ -9,6 +9,7 @@ import re
 import threading
 import time
 import urllib.parse
+from config import TELEGRAM, WXPUSHER
 import requests
 
 # 原先的 print 函数和主线程的锁
@@ -406,11 +407,12 @@ def wecom_bot(title: str, content: str) -> None:
 
 
 def wxpusher(title, content) -> None:
+    print("wxpusher服务启动！")
     headers = {'content-type': 'application/json'}
     data = {"appToken": push_config.get("WXPUSHER_TOKEN"), "content": content, "summary": title, "contentType": 1, "topicIds": push_config.get("WXPUSHER_TOPICS"), "verifyPay": False}
 
     response = requests.post(url=push_config.get("WXPUSHER_URL"), data=json.dumps(data), headers=headers, timeout=15).json()
-    if response["errcode"] == 0:
+    if response["success"]:
         print("wxpusher推送成功！")
     else:
         print("wxpusher推送失败！")
@@ -485,7 +487,7 @@ if push_config.get("QYWX_KEY"):
     notify_function.append(wecom_bot)
 if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"):
     notify_function.append(telegram_bot)
-if push_config.get('WXPUSHER_URL') and push_config.get('') and push_config.get(''):
+if push_config.get('WXPUSHER_URL') and push_config.get('WXPUSHER_TOKEN') and push_config.get('WXPUSHER_TOPICS'):
     notify_function.append(wxpusher)
 
 
