@@ -407,7 +407,7 @@ def wecom_bot(title: str, content: str) -> None:
 
 
 def wxpusher(title, content) -> None:
-    print("wxpusher服务启动！")
+    print("wxpusher服务启动")
     headers = {'content-type': 'application/json'}
     data = {"appToken": push_config.get("WXPUSHER_TOKEN"), "content": content, "summary": title, "contentType": 1, "topicIds": push_config.get("WXPUSHER_TOPICS"), "verifyPay": False}
 
