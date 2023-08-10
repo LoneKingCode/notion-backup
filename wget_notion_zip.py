@@ -11,7 +11,7 @@ from notify import send
 
 TOKEN = 'github_pat_xxxxxxxxxxx'
 SAVE_PATH = "C:/backup/notion/lk-notion-backup.zip"
-COPY_PATH = "H:/backup/notion/lk-notion-backup.zip"
+COPY_PATH = "H:/backup/notion/lk-notion-backup.zip" # 为空则不拷贝
 URL = "https://codeload.github.com/LoneKingCode/xxxxxxxxxxx/zip/refs/heads/main"
 HEADERS = {"Authorization": "token " + TOKEN}
 
@@ -62,7 +62,8 @@ def run():
         return
     else:
         print("下载完成")
-
+    if COPY_PATH == '':
+        return
     print('开始拷贝文件:{}到:{}'.format(SAVE_PATH, COPY_PATH))
 
     # 获取文件大小
