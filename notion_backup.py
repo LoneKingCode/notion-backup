@@ -7,6 +7,7 @@ import requests
 import argparse
 import subprocess
 import re
+from datetime import datetime
 from notify import send
 
 # ={'spaces':[]} 则备份所有空间 'space_blocks':[] 则备份整个空间
@@ -295,7 +296,19 @@ def push():
 def main():
     # 初始化git仓库
     initGit()
-
+    
+    # 获取当前时间戳
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    new_name = f"backup_{timestamp}"
+    if os.path.exists(SAVE_DIR):
+        # 重命名目录
+        try:
+            shutil.move(SAVE_DIR, new_name)
+            print(f"目录{SAVE_DIR}已重命名为: {new_name}")
+        except Exception as e:
+            print(f"重命名{new_name}失败: {e}")
+            raise e
+            
     # 初始化Token
     initNotionToken()
 
@@ -339,6 +352,13 @@ def main():
                 downloadAndUnzip(url, f'{spaceName}.zip')
         else:
             print('space:{}跳过 不在备份列表'.format(spaceName))
+            
+    # 删除重命名后的目录
+    try:
+        shutil.rmtree(new_name)
+        print(f"目录 {new_name} 已删除")
+    except Exception as e:
+        print(f"删除{new_name}失败: {e}")
 
     # git
     print('开始提交代码')
