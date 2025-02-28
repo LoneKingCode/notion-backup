@@ -181,24 +181,32 @@ def exportSpaceBlock(spaceId, blockId):
 
 def request_post(endpoint: str, params: object):
     global NOTION_FILE_TOKEN
-    #print('reqeust:{} {}'.format(endpoint, params))
-    try:
-        response = requests.post(
-            f'{NOTION_API}/{endpoint}',
-            data=json.dumps(params).encode('utf8'),
-            headers={
-                'content-type': 'application/json',
-                'cookie': f'token_v2={NOTION_TOKEN};'
-            },
-        )
-        if response:
-            if not NOTION_FILE_TOKEN and response.cookies['file_token']:              
-                NOTION_FILE_TOKEN = response.cookies['file_token']
-            return response.json()
-        else:
-            print('request url:{} error response:{}'.format(endpoint, response))
-    except Exception as e:
-        print('request url:{} error {}'.format(endpoint, e))
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                f'{NOTION_API}/{endpoint}',
+                data=json.dumps(params).encode('utf8'),
+                headers={
+                    'content-type': 'application/json',
+                    'cookie': f'token_v2={NOTION_TOKEN};'
+                },
+            )
+            if response:
+                # 使用 get 方法避免 keyError
+                file_token = response.cookies.get('file_token')
+                if not NOTION_FILE_TOKEN and file_token:
+                    NOTION_FILE_TOKEN = file_token
+                return response.json()
+            else:
+                print(f"Request url:{endpoint} error response: {response}")
+        except Exception as e:
+            print(f"Request url:{endpoint} error {e}")
+        # 如果还没到最后一次，等待 3 秒后重试
+        if attempt < max_retries - 1:
+            time.sleep(3)
+    print(f"Failed to get a valid response from {endpoint} after {max_retries} attempts.")
+    return None
 
 def getUserContent():
     return request_post('loadUserContent', {})['recordMap']
