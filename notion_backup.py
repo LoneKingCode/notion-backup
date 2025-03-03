@@ -191,6 +191,11 @@ def exportSpaceBlock(spaceId, blockId):
 
 def request_post(endpoint: str, params: object, max_retries=3, retry_time_seconds=3):
     global NOTION_FILE_TOKEN
+    print(
+        "request post:{} max_retries:{} retry_time_seconds:{}".format(
+            endpoint, max_retries, retry_time_seconds
+        )
+    )
     for attempt in range(max_retries):
         try:
             response = requests.post(
@@ -377,9 +382,7 @@ def executeBackup():
 
 
 def main():
-    # ***************如果是gitlab runner 则不需要此代码************
     initGit()
-    # *************************************************************
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     new_name = f"backup_{timestamp}"
@@ -402,11 +405,9 @@ def main():
         print(f"备份失败: {e}")
         raise e
 
-    # ***************如果是gitlab runner 则不需要此代码************
     print("开始提交代码")
     pull()
     push()
-    # *************************************************************
 
     writeLog("notion备份完成")
 
