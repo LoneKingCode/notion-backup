@@ -196,7 +196,8 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
             endpoint, max_retries, retry_time_seconds
         )
     )
-    for attempt in range(max_retries):
+    attempt = 0
+    while attempt < max_retries:
         try:
             response = requests.post(
                 f"{NOTION_API}/{endpoint}",
@@ -205,7 +206,10 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
                     "content-type": "application/json",
                     "cookie": f"token_v2={NOTION_TOKEN};",
                 },
+                timeout=60,
             )
+            if response.status_code in [504, 500, 503]:
+                raise Exception("504 Gateway Time-out,尝试重新连接")
             if response:
                 # 使用 get 方法避免 keyError
                 file_token = response.cookies.get("file_token")
@@ -216,9 +220,8 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
                 print(f"Request url:{endpoint} error response: {response}")
         except Exception as e:
             print(f"Request url:{endpoint} error {e}")
-        # 如果还没到最后一次，等待 3 秒后重试
-        if attempt < max_retries - 1:
-            time.sleep(retry_time_seconds)
+        time.sleep(20)
+
     print(
         f"Failed to get a valid response from {endpoint} after {max_retries} attempts."
     )
