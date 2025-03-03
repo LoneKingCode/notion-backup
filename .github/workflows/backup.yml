@@ -35,5 +35,5 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }} # 在后台配置好token,或者用NOTION_EMAIL和NOTION_PASSWORD也可以
         run: |
           echo '开始执行'
-          python notion_backup.py
+          python -u notion_backup.py
           echo '执行完成'
