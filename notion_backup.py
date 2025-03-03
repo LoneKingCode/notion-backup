@@ -189,7 +189,7 @@ def exportSpaceBlock(spaceId, blockId):
     }
 
 
-def request_post(endpoint: str, params: object, max_retries=3, retry_time_seconds=3):
+def request_post(endpoint: str, params: object, max_retries=3, retry_time_seconds=10):
     global NOTION_FILE_TOKEN
     print(
         "request post:{} max_retries:{} retry_time_seconds:{}".format(
