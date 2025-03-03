@@ -382,7 +382,7 @@ def executeBackup():
                         "enqueueTask", exportSpaceBlock(spaceId, block_id)
                     )
                     if res == None:
-                        raise ("enqueueTask get task id failed")
+                        raise Exception("enqueueTask get task id failed")
                     taskId = res.get("taskId")
                     url = exportUrl(taskId)
                     downloadAndUnzip(url, f"{spaceName}-{block_name}.zip")
