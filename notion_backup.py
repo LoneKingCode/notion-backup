@@ -378,9 +378,12 @@ def executeBackup():
                 for space_block in backup_space_config[spaceName]["space_blocks"]:
                     block_id = space_block["block_id"]
                     block_name = space_block["block_name"]
-                    taskId = request_post(
+                    res = request_post(
                         "enqueueTask", exportSpaceBlock(spaceId, block_id)
-                    ).get("taskId")
+                    )
+                    if res == None:
+                        raise ("enqueueTask get task id failed")
+                    taskId = res.get("taskId")
                     url = exportUrl(taskId)
                     downloadAndUnzip(url, f"{spaceName}-{block_name}.zip")
 
