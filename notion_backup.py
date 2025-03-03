@@ -329,6 +329,11 @@ def push():
     )
 
 
+def wait_seconds(seconds=60):
+    print("wait {} seconds".format(seconds))
+    time.sleep(seconds)
+
+
 def executeBackup():
 
     # 初始化Token
@@ -361,6 +366,9 @@ def executeBackup():
             taskId = request_post("enqueueTask", exportSpace(spaceId)).get("taskId")
             url = exportUrl(taskId)
             downloadAndUnzip(url, f"{spaceName}.zip")
+
+            wait_seconds(60)
+
         elif spaceName in backup_space_names:
             # 指定了space下的block
             if (
@@ -375,11 +383,16 @@ def executeBackup():
                     ).get("taskId")
                     url = exportUrl(taskId)
                     downloadAndUnzip(url, f"{spaceName}-{block_name}.zip")
+
+                    wait_seconds(60)
             else:
                 # 没指定space block则备份整个空间
                 taskId = request_post("enqueueTask", exportSpace(spaceId)).get("taskId")
                 url = exportUrl(taskId)
                 downloadAndUnzip(url, f"{spaceName}.zip")
+
+                wait_seconds(60)
+
         else:
             print("space:{}跳过 不在备份列表".format(spaceName))
 
