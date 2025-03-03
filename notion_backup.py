@@ -234,7 +234,7 @@ def exportUrl(taskId):
     print("Polling for export task: {}".format(taskId))
     while True:
         res = request_post(
-            "getTasks", {"taskIds": [taskId]}, max_retries=5, retry_time_seconds=10
+            "getTasks", {"taskIds": [taskId]}, max_retries=5, retry_time_seconds=15
         )
         tasks = res.get("results")
         task = next(t for t in tasks if t["id"] == taskId)
