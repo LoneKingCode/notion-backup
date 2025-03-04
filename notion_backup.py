@@ -382,6 +382,7 @@ def executeBackup():
                         "enqueueTask", exportSpaceBlock(spaceId, block_id)
                     )
                     if res == None:
+                        print("enqueueTask get task id failed")
                         raise Exception("enqueueTask get task id failed")
                     taskId = res.get("taskId")
                     url = exportUrl(taskId)
