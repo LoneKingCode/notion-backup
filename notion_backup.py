@@ -220,6 +220,7 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
                 print(f"Request url:{endpoint} error response: {response}")
         except Exception as e:
             print(f"Request url:{endpoint} error {e}")
+            attempt += 1
         time.sleep(20)
 
     print(
