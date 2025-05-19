@@ -46,7 +46,7 @@ NOTION_TOKEN = os.getenv("NOTION_TOKEN", "YOUR TOKEN")
 NOTION_FILE_TOKEN = ""
 NOTION_EXPORT_TYPE = os.getenv("NOTION_EXPORT_TYPE", "markdown")  # html pdf
 # 备份文件保存目录
-SAVE_DIR = "backup/"
+SAVE_DIR = "backup"
 # git相关信息
 REPOSITORY_URL = "https://github.com/git_user_name/xxx.git"
 REPOSITORY_BRANCH = "main"
@@ -285,7 +285,7 @@ def remove_files_id():
 
 def downloadAndUnzip(url, filename):
     os.makedirs(SAVE_DIR, exist_ok=True)
-    savePath = SAVE_DIR + filename
+    savePath = SAVE_DIR + "/" + filename
     with requests.get(
         url, stream=True, headers={"cookie": f"file_token={NOTION_FILE_TOKEN}"}
     ) as r:
@@ -346,6 +346,9 @@ def executeBackup():
 
     # userId = list(userContent['notion_user'].keys())[0]
     # print(f'User id: {userId}')
+    if "space" not in userContent:
+        writeLog("notion备份失败:获取信息失败,userContent:{}".format(userContent))
+        return
 
     spaces = [
         (space_id, space_details["value"]["name"])
@@ -416,6 +419,11 @@ def main():
             raise e
     try:
         executeBackup()
+        print("开始提交代码")
+        pull()
+        push()
+
+        writeLog("notion备份完成")
         # 删除重命名后的目录
         try:
             shutil.rmtree(new_name)
@@ -424,13 +432,9 @@ def main():
             print(f"删除 {new_name} 失败: {e}")
     except Exception as e:
         print(f"备份失败: {e}")
+        # 恢复目录名字
+        shutil.move(new_name, SAVE_DIR)
         raise e
-
-    print("开始提交代码")
-    pull()
-    push()
-
-    writeLog("notion备份完成")
 
 
 def run_retry():
