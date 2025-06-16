@@ -426,10 +426,25 @@ def main():
         writeLog("notion备份完成")
         # 删除重命名后的目录
         try:
-            shutil.rmtree(new_name)
-            print(f"目录 {new_name} 已删除")
+            # 获取当前工作目录
+            current_dir = os.getcwd()
+            full_path = os.path.join(current_dir, new_name)
+            print(f"尝试删除目录: {full_path}")
+
+            if not os.path.exists(full_path):
+                print(f"目录不存在: {full_path}")
+                return
+
+            # 使用rm命令强制删除目录
+            cmd = f'rm -rf "{full_path}"'
+            success, stdout, stderr = run_command(cmd)
+            if success:
+                print(f"目录 {full_path} 已删除")
+            else:
+                print(f"删除目录失败: {stderr}")
         except Exception as e:
             print(f"删除 {new_name} 失败: {e}")
+            print(f"当前工作目录: {current_dir}")
     except Exception as e:
         print(f"备份失败: {e}")
         # 恢复目录名字
