@@ -410,13 +410,14 @@ def main():
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     new_name = f"backup_{timestamp}"
-    if os.path.exists(SAVE_DIR):
-        try:
-            shutil.move(SAVE_DIR, new_name)
-            print(f"目录{SAVE_DIR}已重命名为: {new_name}")
-        except Exception as e:
-            print(f"重命名{new_name}失败: {e}")
-            raise e
+    # 先不需要备份到另一个文件夹
+    # if os.path.exists(SAVE_DIR):
+    #     try:
+    #         shutil.move(SAVE_DIR, new_name)
+    #         print(f"目录{SAVE_DIR}已重命名为: {new_name}")
+    #     except Exception as e:
+    #         print(f"重命名{new_name}失败: {e}")
+    #         raise e
     try:
         executeBackup()
         print("开始提交代码")
