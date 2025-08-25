@@ -449,7 +449,7 @@ def main():
     except Exception as e:
         print(f"备份失败: {e}")
         # 恢复目录名字
-        shutil.move(new_name, SAVE_DIR)
+        #shutil.move(new_name, SAVE_DIR)
         raise e
 
 
