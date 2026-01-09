@@ -218,6 +218,7 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
                 return response.json()
             else:
                 print(f"Request url:{endpoint} error response: {response}")
+                attempt += 1
         except Exception as e:
             print(f"Request url:{endpoint} error {e}")
             attempt += 1
