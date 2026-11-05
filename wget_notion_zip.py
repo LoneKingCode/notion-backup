@@ -43,7 +43,7 @@ def run():
         print(f"{SAVE_PATH} 文件不存在")
 
     print('开始下载文件,保存到:{}'.format(SAVE_PATH))
-    response = requests.get(URL, headers=HEADERS, stream=True)
+    response = requests.get(URL, headers=HEADERS, stream=True, timeout=30)
 
     file_size = int(response.headers.get('Content-Length', 0))
     block_size = 8192
