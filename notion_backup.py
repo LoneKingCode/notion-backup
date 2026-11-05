@@ -4,14 +4,12 @@ import time
 import json
 import zipfile
 import requests
-import argparse
 import subprocess
 import re
-from datetime import datetime
 from notify import send
 
-# ={'spaces':[]} 则备份所有空间 'space_blocks':[] 则备份整个空间
-# block id格式切记为-隔开!!!
+# 备份哪些页面只改这里。整空间导出暂不可用，必须填写 space_blocks。
+# block id 用 - 隔开
 DEFAULT_BACKUP_CONFIG = {
     "spaces": [
         {
@@ -30,20 +28,32 @@ DEFAULT_BACKUP_CONFIG = {
     ]
 }
 
+# git相关信息
+REPOSITORY_URL = "https://github.com/git_user_name/xxx.git"
+REPOSITORY_BRANCH = "main"
+GIT_USERNAME = "git_user_name"
+GIT_EMAIL = "git@git.com"
+
+
 # 是否去除所有文件和文件夹的id
 REMOVE_FILES_ID = False
 
 # 默认配置无需更改
 NOTION_TIMEZONE = os.getenv("NOTION_TIMEZONE", "Asia/Shanghai")
 NOTION_LOCALE = os.getenv("NOTION_LOCALE", "en")
-NOTION_API = os.getenv("NOTION_API", "https://www.notion.so/api/v3")
-# python-requests 的默认 UA 会被 Notion 边缘拦截, 导出任务会拿到 id 但永远不启动
+NOTION_API = os.getenv("NOTION_API", "https://app.notion.com/api/v3")
+NOTION_ORIGIN = "https://app.notion.com"
+# 跟当前网页导出使用同一套客户端标识, 否则任务不会写进 task_output
 NOTION_USER_AGENT = os.getenv(
     "NOTION_USER_AGENT",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "(KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
 )
-# getTasks 连续返回空的 not_started 超过这么多次就重新入队
+NOTION_CLIENT_VERSION = os.getenv("NOTION_CLIENT_VERSION", "23.13.20261030.0540")
+NOTION_USER_ID = os.getenv("NOTION_USER_ID", "")
+NOTION_CELL_HINT = os.getenv("NOTION_CELL_HINT", "")
+NOTION_ACTIVE_SPACE_ID = ""
+# task_output 连续没有记录超过这么多次就重新入队
 EXPORT_STUB_LIMIT = 8
 EXPORT_POLL_SECONDS = 20
 EXPORT_TIMEOUT_SECONDS = 30 * 60
@@ -58,11 +68,6 @@ NOTION_FILE_TOKEN = ""
 NOTION_EXPORT_TYPE = os.getenv("NOTION_EXPORT_TYPE", "markdown")  # html pdf
 # 备份文件保存目录
 SAVE_DIR = "backup"
-# git相关信息
-REPOSITORY_URL = "https://github.com/git_user_name/xxx.git"
-REPOSITORY_BRANCH = "main"
-GIT_USERNAME = "git_user_name"
-GIT_EMAIL = "git@git.com"
 
 
 def run_command(cmd):
@@ -145,79 +150,71 @@ def initNotionToken():
     return response.cookies["token_v2"]
 
 
-def exportSpace(spaceId):
+def export_options():
     return {
-        "task": {
-            "eventName": "exportSpace",
-            "request": {
-                "spaceId": spaceId,
-                "shouldExportComments": False,
-                "exportOptions": {
-                    "exportType": NOTION_EXPORT_TYPE,
-                    "timeZone": NOTION_TIMEZONE,
-                    "locale": NOTION_LOCALE,
-                    "flattenExportFiletree": False,
-                    "includeContents": "everything",
-                },
-            },
-        }
+        "exportType": NOTION_EXPORT_TYPE,
+        "timeZone": NOTION_TIMEZONE,
+        "locale": NOTION_LOCALE,
+        "collectionViewExportType": "currentView",
+        "includeContents": "everything",
+        "flattenExportFiletree": False,
+        "preferredViewMap": {},
     }
 
 
-# {
-#     "task": {
-#         "eventName": "exportBlock",
-#         "request": {
-#             "block": {
-#                 "id": "c093243a-a553-45ae-954f-4bf80d995167",
-#                 "spaceId": "38d3bbb5-37de-4891-86cc-9dcfbafc30d0"
-#             },
-#             "recursive": true,
-#             "exportOptions": {
-#                 "exportType": "markdown",
-#                 "timeZone": "Asia/Shanghai",
-#                 "locale": "en",
-#                 "flattenExportFiletree": false
-#             }
-#         }
-#     }
-# }
+def skip_whole_space_export(space_name):
+    print("暂不可用: 空间 {} 不支持整空间导出，请在 space_blocks 里指定页面".format(space_name))
 
 
 def exportSpaceBlock(spaceId, blockId):
+    # 网页「导出」现在走 enqueueExportBlock, 不再走 enqueueTask/exportBlock
     return {
-        "task": {
-            "eventName": "exportBlock",
-            "request": {
-                "block": {"id": blockId, "spaceId": spaceId},
-                "recursive": True,
-                "shouldExportComments": False,
-                "exportOptions": {
-                    "exportType": NOTION_EXPORT_TYPE,
-                    "timeZone": NOTION_TIMEZONE,
-                    "locale": NOTION_LOCALE,
-                    "flattenExportFiletree": False,
-                    "includeContents": "everything",
-                    "collectionViewExportType": "currentView",
-                },
-            },
-        }
+        "endpoint": "enqueueExportBlock",
+        "body": {
+            "block": {"id": blockId, "spaceId": spaceId},
+            "recursive": True,
+            "shouldExportComments": False,
+            "exportOptions": export_options(),
+        },
     }
 
 
 def notion_headers():
     cookie = f"token_v2={NOTION_TOKEN}"
+    if NOTION_USER_ID:
+        cookie += f"; notion_user_id={NOTION_USER_ID}"
     if NOTION_FILE_TOKEN:
         cookie += f"; file_token={NOTION_FILE_TOKEN}"
-    return {
+    headers = {
         "content-type": "application/json",
         "cookie": cookie,
         "user-agent": NOTION_USER_AGENT,
+        "notion-client-version": NOTION_CLIENT_VERSION,
+        "notion-audit-log-platform": "web",
+        "origin": NOTION_ORIGIN,
+        "referer": NOTION_ORIGIN + "/",
     }
+    if NOTION_USER_ID:
+        headers["x-notion-active-user-header"] = NOTION_USER_ID
+    if NOTION_ACTIVE_SPACE_ID:
+        headers["x-notion-space-id"] = NOTION_ACTIVE_SPACE_ID
+    if NOTION_CELL_HINT:
+        headers["x-notion-cell-hint"] = NOTION_CELL_HINT
+        headers["x-notion-cell-hint-source"] = "space-id-mapping"
+    return headers
+
+
+def remember_response(response):
+    global NOTION_FILE_TOKEN, NOTION_CELL_HINT
+    file_token = response.cookies.get("file_token")
+    if not NOTION_FILE_TOKEN and file_token:
+        NOTION_FILE_TOKEN = file_token
+    hint = response.headers.get("x-notion-cell-hint")
+    if hint:
+        NOTION_CELL_HINT = hint
 
 
 def request_post(endpoint: str, params: object, max_retries=3, retry_time_seconds=10):
-    global NOTION_FILE_TOKEN
     print(
         "request post:{} max_retries:{} retry_time_seconds:{}".format(
             endpoint, max_retries, retry_time_seconds
@@ -235,13 +232,15 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
             if response.status_code in [504, 500, 503]:
                 raise Exception("504 Gateway Time-out,尝试重新连接")
             if response:
-                # 使用 get 方法避免 keyError
-                file_token = response.cookies.get("file_token")
-                if not NOTION_FILE_TOKEN and file_token:
-                    NOTION_FILE_TOKEN = file_token
+                remember_response(response)
                 return response.json()
             else:
-                print(f"Request url:{endpoint} error response: {response}")
+                snippet = (response.text or "").replace("\n", " ")[:300]
+                print(
+                    "Request url:{} status:{} body:{}".format(
+                        endpoint, response.status_code, snippet
+                    )
+                )
                 attempt += 1
         except Exception as e:
             print(f"Request url:{endpoint} error {e}")
@@ -259,20 +258,40 @@ def getUserContent():
     return request_post("loadUserContent", {})["recordMap"]
 
 
-def task_is_stub(task):
-    """Notion 找不到任务时会回一个空壳: state=not_started, eventName=unknown, request={}."""
-    if not task or task.get("state") != "not_started":
-        return False
-    event_name = task.get("eventName") or "unknown"
-    return event_name == "unknown" and not task.get("request")
+def record_value(record):
+    """兼容旧的 value.name 和新的 value.value.name."""
+    value = (record or {}).get("value") or {}
+    if not isinstance(value, dict):
+        return {}
+    nested = value.get("value")
+    if isinstance(nested, dict) and (
+        "role" in value or "name" in nested or "id" in nested or "lifecycle" in nested
+    ):
+        return nested
+    return value
 
 
-def pick_task(res, task_id):
-    tasks = (res or {}).get("results") or []
-    for task in tasks:
-        if task.get("id") == task_id:
-            return task
-    return tasks[0] if tasks else None
+def set_active_user(user_content):
+    global NOTION_USER_ID
+    if NOTION_USER_ID:
+        print("使用已设置的用户:{}".format(NOTION_USER_ID))
+        return
+    roots = list((user_content.get("user_root") or {}).keys())
+    users = list((user_content.get("notion_user") or {}).keys())
+    NOTION_USER_ID = (roots or users or [""])[0]
+    print("notion user id:{}".format(NOTION_USER_ID or "未找到"))
+
+
+def list_spaces(user_content):
+    spaces = []
+    for space_id, space_details in (user_content.get("space") or {}).items():
+        value = record_value(space_details)
+        name = value.get("name")
+        if not name:
+            print("space {} 没有 name, keys:{}".format(space_id, list(value.keys())))
+            continue
+        spaces.append((space_id, name))
+    return spaces
 
 
 def export_link_from_status(status):
@@ -286,11 +305,7 @@ def export_link_from_status(status):
 
 
 def fetch_export_url_from_notifications(space_id, start_time_ms):
-    """2024 年中之后, 导出地址经常只出现在通知里, getTasks 不再带 exportURL.
-
-    返回 (url, ok). 没有新通知时 url 为 None 且 ok 为 True; 接口失败时 ok 为 False.
-    """
-    global NOTION_FILE_TOKEN
+    """导出地址如果没写进 task_output，再从通知里找。返回 (url, ok)。"""
     try:
         response = requests.post(
             f"{NOTION_API}/getNotificationLogV2",
@@ -305,9 +320,7 @@ def fetch_export_url_from_notifications(space_id, start_time_ms):
             headers=notion_headers(),
             timeout=30,
         )
-        file_token = response.cookies.get("file_token")
-        if not NOTION_FILE_TOKEN and file_token:
-            NOTION_FILE_TOKEN = file_token
+        remember_response(response)
         if not response.ok:
             print(f"getNotificationLogV2 status:{response.status_code}")
             return None, False
@@ -335,44 +348,115 @@ def fetch_export_url_from_notifications(space_id, start_time_ms):
     return None, True
 
 
-def poll_export_task(task_id, space_id, start_time_ms):
-    """轮询单个导出任务. 返回下载地址, 或在需要重新入队时返回 None."""
+def find_export_url(value, depth=0):
+    if not isinstance(value, dict) or depth > 4:
+        return None
+    link = export_link_from_status(value)
+    if link:
+        return link
+    for key in ("value", "status", "result"):
+        link = find_export_url(value.get(key), depth + 1)
+        if link:
+            return link
+    return None
+
+
+def task_output_value(res, output_id):
+    """task_output[id].value.value 是任务, 其中 value.exportURL 是下载地址."""
+    table = ((res or {}).get("recordMap") or {}).get("task_output") or {}
+    record = table.get(output_id)
+    if record is None and len(table) == 1:
+        record = next(iter(table.values()))
+    if not isinstance(record, dict):
+        return None
+    wrapper = record.get("value")
+    if not isinstance(wrapper, dict):
+        return None
+    body = wrapper.get("value") if isinstance(wrapper.get("value"), dict) else wrapper
+    result = body.get("value") if isinstance(body.get("value"), dict) else {}
+    export_url = result.get("exportURL") or result.get("exportUrl")
+    if not isinstance(export_url, str) or not export_url:
+        export_url = find_export_url(body)
+    return {
+        "lifecycle": body.get("lifecycle") or body.get("state"),
+        "status": body.get("status") or result.get("type"),
+        "exportURL": export_url,
+        "pagesExported": result.get("pagesExported"),
+        "error": body.get("error"),
+    }
+
+
+def enqueue_output_id(res):
+    if not isinstance(res, dict):
+        return None
+    if isinstance(res.get("outputKey"), str) and res["outputKey"]:
+        return res["outputKey"]
+    for key in ("taskId", "id"):
+        if isinstance(res.get(key), str) and res[key]:
+            return res[key]
+    for key in ("result", "task", "data"):
+        found = enqueue_output_id(res.get(key))
+        if found:
+            return found
+    return None
+
+
+def poll_task_output(output_id, space_id, start_time_ms):
+    """轮询 task_output. 网页导出完成后, 下载地址在这里, 不在 getTasks."""
     deadline = time.time() + EXPORT_TIMEOUT_SECONDS
-    stub_count = 0
+    empty_count = 0
     notif_fail = 0
     while time.time() < deadline:
         res = request_post(
-            "getTasks",
-            {"taskIds": [task_id]},
-            max_retries=5,
-            retry_time_seconds=15,
+            "syncRecordValuesMain",
+            {
+                "requests": [
+                    {
+                        "pointer": {
+                            "table": "task_output",
+                            "id": output_id,
+                            "spaceId": space_id,
+                        },
+                        "version": -1,
+                    }
+                ],
+                "spacePointer": {"table": "space", "id": space_id},
+            },
+            max_retries=3,
+            retry_time_seconds=10,
         )
-        task = pick_task(res, task_id)
-        if task_is_stub(task):
-            # 旧接口偶尔只回空壳, 再带上 spaceId 查一次
-            res = request_post(
-                "getTasks",
-                {"taskIds": [task_id], "spaceId": space_id},
-                max_retries=2,
-                retry_time_seconds=10,
+        output = task_output_value(res, output_id)
+        if not output:
+            empty_count += 1
+            print(
+                "task_output 还没有记录 ({}/{})".format(empty_count, EXPORT_STUB_LIMIT)
             )
-            task2 = pick_task(res, task_id)
-            if task2 and not task_is_stub(task2):
-                task = task2
-
-        if not task:
-            print(f"getTasks 没有返回任务 {task_id}")
+            if empty_count >= EXPORT_STUB_LIMIT:
+                print("导出结果一直没有写入,准备重新入队")
+                return None
             time.sleep(EXPORT_POLL_SECONDS)
             continue
 
-        state = task.get("state")
-        export_url = export_link_from_status(task.get("status"))
+        empty_count = 0
+        lifecycle = output.get("lifecycle")
+        status = output.get("status")
+        export_url = output.get("exportURL")
         print(
-            "task:{} state:{} eventName:{}".format(
-                task_id, state, task.get("eventName")
+            "task_output:{} lifecycle:{} status:{} pages:{}".format(
+                output_id, lifecycle or "-", status or "-", output.get("pagesExported")
             )
         )
-        if state == "success" and export_url:
+        if lifecycle in ("failure", "failed", "dead") or status in (
+            "failure",
+            "failed",
+        ):
+            raise Exception(
+                "export task failure: {}".format(
+                    output.get("error") or lifecycle or status
+                )
+            )
+        # lifecycle=success 且 status=complete 时, value.exportURL 已经可用
+        if export_url:
             print("download url:" + export_url)
             return export_url
 
@@ -385,28 +469,6 @@ def poll_export_task(task_id, space_id, start_time_ms):
                 return notif_url
             if not notif_ok:
                 notif_fail += 1
-                if notif_fail >= 3:
-                    print("通知接口连续失败,后续只轮询 getTasks")
-
-        if state == "success" and not export_url:
-            print("导出已完成,下载地址还没写上,继续等")
-            time.sleep(EXPORT_POLL_SECONDS)
-            continue
-        if state == "failure":
-            raise Exception("export task failure: {}".format(task.get("error")))
-        if task_is_stub(task):
-            stub_count += 1
-            print(
-                "任务是空的 not_started ({}/{}), Notion 没有真正开始这个导出".format(
-                    stub_count, EXPORT_STUB_LIMIT
-                )
-            )
-            if stub_count >= EXPORT_STUB_LIMIT:
-                print("任务一直未开始,准备重新入队")
-                return None
-        else:
-            stub_count = 0
-            print("{}.".format(state), end="", flush=True)
         time.sleep(EXPORT_POLL_SECONDS)
 
     print("轮询超过 {} 秒,准备重新入队".format(EXPORT_TIMEOUT_SECONDS))
@@ -414,35 +476,49 @@ def poll_export_task(task_id, space_id, start_time_ms):
 
 
 def exportUrl(task_payload, space_id):
+    global NOTION_ACTIVE_SPACE_ID
+    previous_space = NOTION_ACTIVE_SPACE_ID
+    NOTION_ACTIVE_SPACE_ID = space_id
+    endpoint = task_payload["endpoint"]
+    body = task_payload["body"]
+    print(
+        "导出 {} user:{} space:{}".format(
+            endpoint, NOTION_USER_ID or "未设置", space_id
+        )
+    )
     last_error = None
-    for attempt in range(1, EXPORT_ENQUEUE_ATTEMPTS + 1):
-        # 留 2 秒余量, 避免通知时间戳和本机时钟差一点就漏掉
-        start_time_ms = int(time.time() * 1000) - 2000
-        res = request_post("enqueueTask", task_payload)
-        print("enqueueTask res:{}".format(res))
-        task_id = (res or {}).get("taskId")
-        if not task_id:
-            last_error = Exception("enqueueTask get task id failed: {}".format(res))
-            print(str(last_error))
-        else:
-            print(
-                "Polling for export task: {} attempt {}/{}".format(
-                    task_id, attempt, EXPORT_ENQUEUE_ATTEMPTS
+    try:
+        for attempt in range(1, EXPORT_ENQUEUE_ATTEMPTS + 1):
+            start_time_ms = int(time.time() * 1000) - 2000
+            res = request_post(endpoint, body)
+            output_id = enqueue_output_id(res)
+            print("{} output:{}".format(endpoint, output_id))
+            if not output_id:
+                last_error = Exception(
+                    "{} 没有返回任务 id: {}".format(endpoint, res)
                 )
-            )
-            try:
-                url = poll_export_task(task_id, space_id, start_time_ms)
-            except Exception as e:
-                last_error = e
-                print("导出任务失败: {}".format(e))
-                url = None
-            if url:
-                return url
-            last_error = last_error or Exception(
-                "export task {} stuck".format(task_id)
-            )
-        if attempt < EXPORT_ENQUEUE_ATTEMPTS:
-            wait_seconds(30)
+                print(str(last_error))
+            else:
+                print(
+                    "Polling task_output: {} attempt {}/{}".format(
+                        output_id, attempt, EXPORT_ENQUEUE_ATTEMPTS
+                    )
+                )
+                try:
+                    url = poll_task_output(output_id, space_id, start_time_ms)
+                except Exception as e:
+                    last_error = e
+                    print("导出任务失败: {}".format(e))
+                    url = None
+                if url:
+                    return url
+                last_error = last_error or Exception(
+                    "export {} stuck".format(output_id)
+                )
+            if attempt < EXPORT_ENQUEUE_ATTEMPTS:
+                wait_seconds(30)
+    finally:
+        NOTION_ACTIVE_SPACE_ID = previous_space
     raise last_error or Exception("export task failed")
 
 
@@ -487,7 +563,7 @@ def downloadAndUnzip(url, filename):
         headers={
             "cookie": cookie,
             "user-agent": NOTION_USER_AGENT,
-            "referer": "https://www.notion.so/",
+            "referer": NOTION_ORIGIN + "/",
         },
     ) as r:
         with open(savePath, "wb") as f:
@@ -543,18 +619,21 @@ def executeBackup():
 
     # 获取用户信息
     userContent = getUserContent()
+    set_active_user(userContent)
     time.sleep(3)
 
-    # userId = list(userContent['notion_user'].keys())[0]
-    # print(f'User id: {userId}')
     if "space" not in userContent:
         writeLog("notion备份失败:获取信息失败,userContent:{}".format(userContent))
         return
 
-    spaces = [
-        (space_id, space_details["value"]["name"])
-        for (space_id, space_details) in userContent["space"].items()
-    ]
+    spaces = list_spaces(userContent)
+    if not spaces:
+        writeLog(
+            "notion备份失败:没有解析到空间,space keys:{}".format(
+                list((userContent.get("space") or {}).keys())
+            )
+        )
+        return
     backup_space_names = []
     backup_space_config = {}
     for backup_config_item in DEFAULT_BACKUP_CONFIG["spaces"]:
@@ -564,14 +643,10 @@ def executeBackup():
     print(f"Available spaces total:{len(spaces)}")
     for spaceId, spaceName in spaces:
         print(f"\t-  {spaceId}:{spaceName}")
-        taskId = ""
 
-        # 备份所有空间
+        # 整空间导出已不可用, 只备份配置了页面的空间
         if len(backup_space_names) == 0:
-            url = exportUrl(exportSpace(spaceId), spaceId)
-            downloadAndUnzip(url, f"{spaceName}.zip")
-
-            wait_seconds(60)
+            skip_whole_space_export(spaceName)
 
         elif spaceName in backup_space_names:
             # 指定了space下的block
@@ -587,11 +662,7 @@ def executeBackup():
 
                     wait_seconds(60)
             else:
-                # 没指定space block则备份整个空间
-                url = exportUrl(exportSpace(spaceId), spaceId)
-                downloadAndUnzip(url, f"{spaceName}.zip")
-
-                wait_seconds(60)
+                skip_whole_space_export(spaceName)
 
         else:
             print("space:{}跳过 不在备份列表".format(spaceName))
@@ -599,49 +670,14 @@ def executeBackup():
 
 def main():
     initGit()
-
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    new_name = f"backup_{timestamp}"
-    # 先不需要备份到另一个文件夹
-    # if os.path.exists(SAVE_DIR):
-    #     try:
-    #         shutil.move(SAVE_DIR, new_name)
-    #         print(f"目录{SAVE_DIR}已重命名为: {new_name}")
-    #     except Exception as e:
-    #         print(f"重命名{new_name}失败: {e}")
-    #         raise e
     try:
         executeBackup()
         print("开始提交代码")
         pull()
         push()
-
         writeLog("notion备份完成")
-        # 删除重命名后的目录
-        # try:
-        #     # 获取当前工作目录
-        #     current_dir = os.getcwd()
-        #     full_path = os.path.join(current_dir, new_name)
-        #     print(f"尝试删除目录: {full_path}")
-
-        #     if not os.path.exists(full_path):
-        #         print(f"目录不存在: {full_path}")
-        #         return
-
-        #     # 使用rm命令强制删除目录
-        #     cmd = f'rm -rf "{full_path}"'
-        #     success, stdout, stderr = run_command(cmd)
-        #     if success:
-        #         print(f"目录 {full_path} 已删除")
-        #     else:
-        #         print(f"删除目录失败: {stderr}")
-        # except Exception as e:
-        #     print(f"删除 {new_name} 失败: {e}")
-        #     print(f"当前工作目录: {current_dir}")
     except Exception as e:
         print(f"备份失败: {e}")
-        # 恢复目录名字
-        #shutil.move(new_name, SAVE_DIR)
         raise e
 
 
@@ -664,44 +700,5 @@ def run_retry():
 
 if __name__ == "__main__":
     writeLog("开始执行notion备份")
-    parser = argparse.ArgumentParser(description="ArgUtils")
-    parser.add_argument(
-        "-c",
-        type=str,
-        default="",
-        required=False,
-        help='配置文件路径,内容格式为 {"spaces": [{"space_name": "xxx", "space_blocks": [{"block_id": "12345678-1234-1234-1234-123456789123", "block_name": "xx"}]}]}',
-    )
-
-    args = parser.parse_args()
-    if args.c:
-        try:
-            with open(args.c, "r") as f:
-                c = f.read()
-                print("读取文件:{}内容为:\n{}".format(args.c, c))
-                DEFAULT_BACKUP_CONFIG = json.loads(c)
-                print("使用参数 DEFAULT_BACKUP_CONFIG:{}".format(DEFAULT_BACKUP_CONFIG))
-        except Exception as e:
-            print("参数格式错误,请检查是否为合法的json字符串")
-            print(
-                '{"spaces": [{"space_name": "xxx", "space_blocks": [{"block_id": "12345678-1234-1234-1234-123456789123", "block_name": "xx"}]}]}'
-            )
-            raise Exception("参数格式错误,请检查是否为合法的json字符串:" + str(e))
-    else:
-        print("使用默认配置 DEFAULT_BACKUP_CONFIG:{}".format(DEFAULT_BACKUP_CONFIG))
-
+    print("使用顶部配置 DEFAULT_BACKUP_CONFIG:{}".format(DEFAULT_BACKUP_CONFIG))
     run_retry()
-
-# 定时定点执行
-# nohup python3 notion-backup.py -u 2>&1 >> /tmp/notion-backup.log
-# if __name__ == '__main__':
-#     print('开始执行')
-#     running = False
-#     while True and not running:
-#         now = datetime.datetime.now()
-#         if now.hour == 3 and now.minute == 0:
-#             running = True
-#             run_retry()
-#             running = False
-
-#         time.sleep(30)

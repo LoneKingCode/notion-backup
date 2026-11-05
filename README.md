@@ -4,7 +4,7 @@
 
 ## Automatic Notion workspace backup to git and local
 
-基于`python3`，利用 notion 官方 api，自动导出所有工作空间内数据为 markdown 格式,虽然官方 API 导出的为 zip，但是脚本会解压，然后一起上传至 github，因为在 github，所以也拥有了版本历史功能。
+基于 `python3`，调用 Notion 网页正在使用的导出接口，按脚本顶部的配置导出指定页面及其子页面。导出结果是 zip，脚本会解压，再提交到 git 仓库，从而保留版本历史。整空间导出暂不可用。
 
 ### Debian/Ubuntu 简单安装 python3 及 pip3
 
@@ -25,7 +25,7 @@ yum install python3-pip -y
 ### 验证安装结果
 
 ```
-python3 -v
+python3 --version
 pip3 -V
 ```
 
@@ -68,7 +68,7 @@ GIT_USERNAME ='111'
 GIT_EMAIL ='111@111.com'
 ```
 
-默认上传到 github，如果使用，需要自己新建一个私有仓库，然后 notion-backup.py 提交至该新仓库，然后在该仓库目录下运行 notion-backup.py 即可  
+默认上传到 github。需要自己新建一个私有仓库，把本项目放进该仓库，再在仓库目录下运行 `notion_backup.py`。
 注：如果不用ci执行，在服务器本地执行的话  
 记得修改`.git`文件夹中的`config`文件，把用户名和密码配置到仓库地址 <https://username:password@github.com/username/notion-backup.git> 上，防止脚本自动 push 代码时，需要输入用户名密码
 或者手动先push一次，并且设置credentials
@@ -84,54 +84,39 @@ __pycache__
 
 ### 5. 备份配置
 
-notion-backup.py顶部的`DEFAULT_BACKUP_CONFIG`变量
-主要`block_id`是`-`分开的注意位数
-{'spaces':[]} 则备份所有空间 'space_blocks':[] 则备份整个空间
+只改 `notion_backup.py` 顶部的 `DEFAULT_BACKUP_CONFIG`。脚本不读取配置文件。
+`block_id` 必须是用 `-` 隔开的 UUID。
+`space_blocks` 必须填写。`spaces` 为空，或者某个空间没有 `space_blocks` 时，脚本只输出「暂不可用」，不会导出该空间。
 
 ```python
-# 1.备份所有空间
-{'spaces': []}
-# 2.备份指定空间所有block
-{'spaces': [
-        {'space_name': 'space_name', 'space_blocks': []}
-    ]
-}
-# 2.1两种方式都可以
-{'spaces': [
-        {'space_name': 'space_name'}
-    ]
-}
-# 3.备份指定空间指定block及block的子页面
-{'spaces': [
-        {'space_name': 'space_name', 'space_blocks': [
-                {'block_id': '12345678-1234-1234-1234-123456789123', 'block_name': 'Home'}
-            ]
+{
+    "spaces": [
+        {
+            "space_name": "space_name",
+            "space_blocks": [
+                {
+                    "block_id": "12345678-1234-1234-1234-123456789123",
+                    "block_name": "Home",
+                }
+            ],
         }
     ]
 }
-# 4.也可以修改config.json
-config.json为上面备份配置的json格式数据,注意里面符号为#双引号#
 ```
+
+`space_name` 要和 Notion 里的空间名称一致。每个页面会连同子页面一起导出。
 
 ### 6. 执行脚本
 
 ```shell
-python3 notion-backup.py
+python3 notion_backup.py
 ```
 
-```shell
-config.json为上面备份配置的json格式数据,注意里面符号为#双引号#
-python3 notion-backup.py -c /your_dir/config.json
-```
-
-```python
-run_job.py是利用python的schedule定时执行的,有需要可以用
-```
+`run_job.py` 用 `schedule` 每天 03:00 执行一次，需要的话单独运行它。
 
 ### 7. 导出其他格式
 
-修改代码中`exportTask`方法中的`exportType`为要导出的类型
-markdown/html/pdf
+修改脚本顶部的 `NOTION_EXPORT_TYPE`。可选 `markdown`、`html`、`pdf`，默认是 `markdown`。
 
 ### 8. 注意事项
 
@@ -160,7 +145,7 @@ markdown/html/pdf
 
 ### 11. 其他使用方法
 
-搭配`Github`的`CI/DI`以及`Schedule`，可以实现全自动定时打包，上传，而且不需要在自己的服务器上执行。  
+搭配 GitHub Actions 的定时任务，可以在云端自动打包并上传，不需要在自己的服务器上执行。
 参考文件.github/workflows/backup.yml  
 需要配置secret,在项目主页菜单的settings/secrets and variables/Actions中配置  
 需要定时执行的话配置schedule,修改cron表达式  
