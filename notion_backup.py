@@ -35,8 +35,19 @@ REMOVE_FILES_ID = False
 
 # 默认配置无需更改
 NOTION_TIMEZONE = os.getenv("NOTION_TIMEZONE", "Asia/Shanghai")
-NOTION_LOCALE = os.getenv("NOTION_TIMEZONE", "en")
+NOTION_LOCALE = os.getenv("NOTION_LOCALE", "en")
 NOTION_API = os.getenv("NOTION_API", "https://www.notion.so/api/v3")
+# python-requests 的默认 UA 会被 Notion 边缘拦截, 导出任务会拿到 id 但永远不启动
+NOTION_USER_AGENT = os.getenv(
+    "NOTION_USER_AGENT",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+)
+# getTasks 连续返回空的 not_started 超过这么多次就重新入队
+EXPORT_STUB_LIMIT = 8
+EXPORT_POLL_SECONDS = 20
+EXPORT_TIMEOUT_SECONDS = 30 * 60
+EXPORT_ENQUEUE_ATTEMPTS = 3
 # 邮箱和用户名
 NOTION_EMAIL = os.getenv("NOTION_EMAIL", "")
 NOTION_PASSWORD = os.getenv("NOTION_PASSWORD", "")
@@ -140,11 +151,13 @@ def exportSpace(spaceId):
             "eventName": "exportSpace",
             "request": {
                 "spaceId": spaceId,
+                "shouldExportComments": False,
                 "exportOptions": {
                     "exportType": NOTION_EXPORT_TYPE,
                     "timeZone": NOTION_TIMEZONE,
                     "locale": NOTION_LOCALE,
                     "flattenExportFiletree": False,
+                    "includeContents": "everything",
                 },
             },
         }
@@ -178,14 +191,28 @@ def exportSpaceBlock(spaceId, blockId):
             "request": {
                 "block": {"id": blockId, "spaceId": spaceId},
                 "recursive": True,
+                "shouldExportComments": False,
                 "exportOptions": {
                     "exportType": NOTION_EXPORT_TYPE,
                     "timeZone": NOTION_TIMEZONE,
                     "locale": NOTION_LOCALE,
                     "flattenExportFiletree": False,
+                    "includeContents": "everything",
+                    "collectionViewExportType": "currentView",
                 },
             },
         }
+    }
+
+
+def notion_headers():
+    cookie = f"token_v2={NOTION_TOKEN}"
+    if NOTION_FILE_TOKEN:
+        cookie += f"; file_token={NOTION_FILE_TOKEN}"
+    return {
+        "content-type": "application/json",
+        "cookie": cookie,
+        "user-agent": NOTION_USER_AGENT,
     }
 
 
@@ -202,10 +229,7 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
             response = requests.post(
                 f"{NOTION_API}/{endpoint}",
                 data=json.dumps(params).encode("utf8"),
-                headers={
-                    "content-type": "application/json",
-                    "cookie": f"token_v2={NOTION_TOKEN};",
-                },
+                headers=notion_headers(),
                 timeout=60,
             )
             if response.status_code in [504, 500, 503]:
@@ -222,7 +246,8 @@ def request_post(endpoint: str, params: object, max_retries=3, retry_time_second
         except Exception as e:
             print(f"Request url:{endpoint} error {e}")
             attempt += 1
-        time.sleep(20)
+        if attempt < max_retries:
+            time.sleep(retry_time_seconds)
 
     print(
         f"Failed to get a valid response from {endpoint} after {max_retries} attempts."
@@ -234,25 +259,191 @@ def getUserContent():
     return request_post("loadUserContent", {})["recordMap"]
 
 
-def exportUrl(taskId):
-    url = False
-    print("Polling for export task: {}".format(taskId))
-    while True:
-        res = request_post(
-            "getTasks", {"taskIds": [taskId]}, max_retries=5, retry_time_seconds=15
+def task_is_stub(task):
+    """Notion 找不到任务时会回一个空壳: state=not_started, eventName=unknown, request={}."""
+    if not task or task.get("state") != "not_started":
+        return False
+    event_name = task.get("eventName") or "unknown"
+    return event_name == "unknown" and not task.get("request")
+
+
+def pick_task(res, task_id):
+    tasks = (res or {}).get("results") or []
+    for task in tasks:
+        if task.get("id") == task_id:
+            return task
+    return tasks[0] if tasks else None
+
+
+def export_link_from_status(status):
+    if not isinstance(status, dict):
+        return None
+    for key in ("exportURL", "exportUrl", "export_url", "url"):
+        link = status.get(key)
+        if isinstance(link, str) and link:
+            return link
+    return None
+
+
+def fetch_export_url_from_notifications(space_id, start_time_ms):
+    """2024 年中之后, 导出地址经常只出现在通知里, getTasks 不再带 exportURL.
+
+    返回 (url, ok). 没有新通知时 url 为 None 且 ok 为 True; 接口失败时 ok 为 False.
+    """
+    global NOTION_FILE_TOKEN
+    try:
+        response = requests.post(
+            f"{NOTION_API}/getNotificationLogV2",
+            data=json.dumps(
+                {
+                    "spaceId": space_id,
+                    "size": 20,
+                    "type": "unread_and_read",
+                    "variant": "no_grouping",
+                }
+            ).encode("utf8"),
+            headers=notion_headers(),
+            timeout=30,
         )
-        tasks = res.get("results")
-        task = next(t for t in tasks if t["id"] == taskId)
-        if task["state"] == "success":
-            url = task["status"]["exportURL"]
-            print("download url:" + url)
-            break
-        elif task["state"] == "failure":
-            print(task["error"])
+        file_token = response.cookies.get("file_token")
+        if not NOTION_FILE_TOKEN and file_token:
+            NOTION_FILE_TOKEN = file_token
+        if not response.ok:
+            print(f"getNotificationLogV2 status:{response.status_code}")
+            return None, False
+        data = response.json()
+    except Exception as e:
+        print(f"getNotificationLogV2 error:{e}")
+        return None, False
+
+    activities = ((data or {}).get("recordMap") or {}).get("activity") or {}
+    for activity in activities.values():
+        raw = (activity or {}).get("value") or {}
+        nested = raw.get("value") if isinstance(raw, dict) else None
+        value = nested if isinstance(nested, dict) and nested.get("type") else raw
+        if not isinstance(value, dict) or value.get("type") != "export-completed":
+            continue
+        try:
+            started = float(value.get("start_time"))
+        except (TypeError, ValueError):
+            continue
+        if started < start_time_ms:
+            continue
+        edits = value.get("edits") or []
+        if edits and isinstance(edits[0].get("link"), str) and edits[0]["link"]:
+            return edits[0]["link"], True
+    return None, True
+
+
+def poll_export_task(task_id, space_id, start_time_ms):
+    """轮询单个导出任务. 返回下载地址, 或在需要重新入队时返回 None."""
+    deadline = time.time() + EXPORT_TIMEOUT_SECONDS
+    stub_count = 0
+    notif_fail = 0
+    while time.time() < deadline:
+        res = request_post(
+            "getTasks",
+            {"taskIds": [task_id]},
+            max_retries=5,
+            retry_time_seconds=15,
+        )
+        task = pick_task(res, task_id)
+        if task_is_stub(task):
+            # 旧接口偶尔只回空壳, 再带上 spaceId 查一次
+            res = request_post(
+                "getTasks",
+                {"taskIds": [task_id], "spaceId": space_id},
+                max_retries=2,
+                retry_time_seconds=10,
+            )
+            task2 = pick_task(res, task_id)
+            if task2 and not task_is_stub(task2):
+                task = task2
+
+        if not task:
+            print(f"getTasks 没有返回任务 {task_id}")
+            time.sleep(EXPORT_POLL_SECONDS)
+            continue
+
+        state = task.get("state")
+        export_url = export_link_from_status(task.get("status"))
+        print(
+            "task:{} state:{} eventName:{}".format(
+                task_id, state, task.get("eventName")
+            )
+        )
+        if state == "success" and export_url:
+            print("download url:" + export_url)
+            return export_url
+
+        if notif_fail < 3:
+            notif_url, notif_ok = fetch_export_url_from_notifications(
+                space_id, start_time_ms
+            )
+            if notif_url:
+                print("download url from notification:" + notif_url)
+                return notif_url
+            if not notif_ok:
+                notif_fail += 1
+                if notif_fail >= 3:
+                    print("通知接口连续失败,后续只轮询 getTasks")
+
+        if state == "success" and not export_url:
+            print("导出已完成,下载地址还没写上,继续等")
+            time.sleep(EXPORT_POLL_SECONDS)
+            continue
+        if state == "failure":
+            raise Exception("export task failure: {}".format(task.get("error")))
+        if task_is_stub(task):
+            stub_count += 1
+            print(
+                "任务是空的 not_started ({}/{}), Notion 没有真正开始这个导出".format(
+                    stub_count, EXPORT_STUB_LIMIT
+                )
+            )
+            if stub_count >= EXPORT_STUB_LIMIT:
+                print("任务一直未开始,准备重新入队")
+                return None
         else:
-            print("{}.".format(task["state"]), end="", flush=True)
-            time.sleep(20)
-    return url
+            stub_count = 0
+            print("{}.".format(state), end="", flush=True)
+        time.sleep(EXPORT_POLL_SECONDS)
+
+    print("轮询超过 {} 秒,准备重新入队".format(EXPORT_TIMEOUT_SECONDS))
+    return None
+
+
+def exportUrl(task_payload, space_id):
+    last_error = None
+    for attempt in range(1, EXPORT_ENQUEUE_ATTEMPTS + 1):
+        # 留 2 秒余量, 避免通知时间戳和本机时钟差一点就漏掉
+        start_time_ms = int(time.time() * 1000) - 2000
+        res = request_post("enqueueTask", task_payload)
+        print("enqueueTask res:{}".format(res))
+        task_id = (res or {}).get("taskId")
+        if not task_id:
+            last_error = Exception("enqueueTask get task id failed: {}".format(res))
+            print(str(last_error))
+        else:
+            print(
+                "Polling for export task: {} attempt {}/{}".format(
+                    task_id, attempt, EXPORT_ENQUEUE_ATTEMPTS
+                )
+            )
+            try:
+                url = poll_export_task(task_id, space_id, start_time_ms)
+            except Exception as e:
+                last_error = e
+                print("导出任务失败: {}".format(e))
+                url = None
+            if url:
+                return url
+            last_error = last_error or Exception(
+                "export task {} stuck".format(task_id)
+            )
+        if attempt < EXPORT_ENQUEUE_ATTEMPTS:
+            wait_seconds(30)
+    raise last_error or Exception("export task failed")
 
 
 def remove_files_id():
@@ -287,8 +478,17 @@ def remove_files_id():
 def downloadAndUnzip(url, filename):
     os.makedirs(SAVE_DIR, exist_ok=True)
     savePath = SAVE_DIR + "/" + filename
+    cookie = f"token_v2={NOTION_TOKEN}"
+    if NOTION_FILE_TOKEN:
+        cookie += f"; file_token={NOTION_FILE_TOKEN}"
     with requests.get(
-        url, stream=True, headers={"cookie": f"file_token={NOTION_FILE_TOKEN}"}
+        url,
+        stream=True,
+        headers={
+            "cookie": cookie,
+            "user-agent": NOTION_USER_AGENT,
+            "referer": "https://www.notion.so/",
+        },
     ) as r:
         with open(savePath, "wb") as f:
             shutil.copyfileobj(r.raw, f)
@@ -368,8 +568,7 @@ def executeBackup():
 
         # 备份所有空间
         if len(backup_space_names) == 0:
-            taskId = request_post("enqueueTask", exportSpace(spaceId)).get("taskId")
-            url = exportUrl(taskId)
+            url = exportUrl(exportSpace(spaceId), spaceId)
             downloadAndUnzip(url, f"{spaceName}.zip")
 
             wait_seconds(60)
@@ -383,21 +582,13 @@ def executeBackup():
                 for space_block in backup_space_config[spaceName]["space_blocks"]:
                     block_id = space_block["block_id"]
                     block_name = space_block["block_name"]
-                    res = request_post(
-                        "enqueueTask", exportSpaceBlock(spaceId, block_id)
-                    )
-                    if res == None:
-                        print("enqueueTask get task id failed")
-                        raise Exception("enqueueTask get task id failed")
-                    taskId = res.get("taskId")
-                    url = exportUrl(taskId)
+                    url = exportUrl(exportSpaceBlock(spaceId, block_id), spaceId)
                     downloadAndUnzip(url, f"{spaceName}-{block_name}.zip")
 
                     wait_seconds(60)
             else:
                 # 没指定space block则备份整个空间
-                taskId = request_post("enqueueTask", exportSpace(spaceId)).get("taskId")
-                url = exportUrl(taskId)
+                url = exportUrl(exportSpace(spaceId), spaceId)
                 downloadAndUnzip(url, f"{spaceName}.zip")
 
                 wait_seconds(60)
